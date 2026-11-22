@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>빚 제로 플래너 · Debt Zero v2.1</title>
+  <title>빚 제로 플래너 · Debt Zero v2.2</title>
 
   <!-- 모바일 PWA 전체 화면(Standalone) 메타 태그 & 외부 매니페스트 연동 -->
   <meta name="theme-color" content="#0b1120" />
@@ -24,9 +24,9 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 
-  <!-- Firebase Compat v9 SDK (Firestore 실시간 양방향 동기화) -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <!-- Firebase Compat v10 SDK (Firestore 실시간 양방향 동기화) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
   <script>
     tailwind.config = {
@@ -96,7 +96,8 @@
       border: 3px solid #020617;
       cursor: pointer;
     }
-    input[type="month"]::-webkit-calendar-picker-indicator {
+    input[type="month"]::-webkit-calendar-picker-indicator,
+    input[type="date"]::-webkit-calendar-picker-indicator {
       filter: invert(0.85);
       cursor: pointer;
     }
@@ -128,7 +129,7 @@
         <div class="min-w-0">
           <div class="flex items-center gap-1.5">
             <h1 class="text-sm font-extrabold tracking-tight text-white leading-tight truncate">빚 제로 플래너</h1>
-            <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">v2.1</span>
+            <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">v2.2</span>
           </div>
           <p id="header-room-label" class="text-[11px] text-slate-400 font-medium truncate">로컬 저장소 사용 중</p>
         </div>
@@ -168,9 +169,21 @@
     </div>
 
     <!-- =========================================================
-         TAB 1: 홈 / 현황 (히어로 대시보드 & 부채 목록)
+         TAB 1: 홈 / 현황 (스마트 전세 필터 & 히어로 대시보드 & 부채 목록)
          ========================================================= -->
-    <section id="tab-home" class="space-y-5 animate-fade-up">
+    <section id="tab-home" class="space-y-4 animate-fade-up">
+
+      <!-- 스마트 전세대출 필터 토글 바 -->
+      <div class="p-1 rounded-2xl bg-slate-900 border border-slate-800 grid grid-cols-2 gap-1">
+        <button type="button" onclick="setExcludeJeonse(true)" data-jeonse-toggle="exclude"
+          class="py-2 px-2 rounded-xl text-[11px] font-extrabold transition active:scale-[0.98] text-center truncate">
+          🎯 신용·마통 집중 (전세 제외)
+        </button>
+        <button type="button" onclick="setExcludeJeonse(false)" data-jeonse-toggle="include"
+          class="py-2 px-2 rounded-xl text-[11px] font-extrabold transition active:scale-[0.98] text-center truncate">
+          🏠 전체 부채 (전세 포함)
+        </button>
+      </div>
 
       <!-- 히어로 대시보드 카드 -->
       <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-cyan-950/40 border border-slate-800 p-5 shadow-xl">
@@ -183,9 +196,15 @@
           </span>
         </div>
 
-        <p class="text-xs font-medium text-slate-400">총 남은 부채</p>
-        <div class="flex items-baseline gap-2 mt-0.5">
-          <h2 id="hero-remaining" class="text-3xl font-extrabold tracking-tight text-white tabular-nums">0원</h2>
+        <div class="flex items-baseline justify-between gap-2">
+          <div>
+            <p id="hero-mode-caption" class="text-xs font-medium text-slate-400">총 남은 부채 (신용·마통 집중)</p>
+            <h2 id="hero-remaining" class="text-3xl font-extrabold tracking-tight text-white tabular-nums mt-0.5">0원</h2>
+          </div>
+          <div class="text-right shrink-0">
+            <p class="text-[10px] font-medium text-slate-400">월 예상 이자</p>
+            <p id="hero-monthly-interest" class="text-sm font-extrabold text-rose-400 tabular-nums mt-0.5">0원</p>
+          </div>
         </div>
 
         <!-- 전체 진행률 바 -->
@@ -199,7 +218,7 @@
           </div>
         </div>
 
-        <!-- 예상 완납일 & 절약 예정 이자 -->
+        <!-- 예상 완납일 & 총 예상 이자/절약 이자 -->
         <div class="grid grid-cols-2 gap-2.5 mt-4 pt-4 border-t border-slate-800/80">
           <div class="rounded-2xl bg-slate-950/80 border border-slate-800/80 p-3">
             <p class="text-[11px] text-slate-400 font-medium">예상 완납일</p>
@@ -207,9 +226,9 @@
             <p id="hero-dday" class="text-[11px] font-bold text-cyan-400 mt-0.5 tabular-nums">D-0일</p>
           </div>
           <div class="rounded-2xl bg-slate-950/80 border border-slate-800/80 p-3">
-            <p class="text-[11px] text-slate-400 font-medium">절약 예정 이자</p>
-            <p id="hero-saved-interest" class="text-sm font-extrabold text-emerald-400 mt-0.5 tabular-nums">0원</p>
-            <p id="hero-saved-months" class="text-[11px] font-medium text-slate-400 mt-0.5 tabular-nums">기본 상환 대비</p>
+            <p id="hero-interest-card-title" class="text-[11px] text-slate-400 font-medium">완납까지 총 이자</p>
+            <p id="hero-interest-card-value" class="text-sm font-extrabold text-emerald-400 mt-0.5 tabular-nums">0원</p>
+            <p id="hero-interest-card-sub" class="text-[11px] font-medium text-slate-400 mt-0.5 tabular-nums">월 추가 상환 반영</p>
           </div>
         </div>
 
@@ -223,12 +242,12 @@
         </button>
       </div>
 
-      <!-- 음의 상환 경고 배너 -->
-      <div id="home-warning-banner" class="hidden rounded-2xl bg-rose-500/10 border border-rose-500/40 p-3.5 flex items-start gap-2.5">
-        <span class="text-base mt-0.5">⚠️</span>
-        <div class="text-xs text-rose-200 leading-relaxed">
-          <p class="font-bold text-rose-300">월 납입금이 월 이자보다 적은 부채가 있습니다!</p>
-          <p id="home-warning-detail" class="text-rose-200/80 mt-0.5"></p>
+      <!-- 만기 임박 알림 배너 (90일 이내 만기 도래 대출 존재 시 표시) -->
+      <div id="home-maturity-banner" class="hidden rounded-2xl bg-amber-500/10 border border-amber-500/40 p-3.5 flex items-start gap-2.5">
+        <span class="text-base mt-0.5">⏰</span>
+        <div class="text-xs text-amber-100 leading-relaxed">
+          <p class="font-bold text-amber-300">90일 이내 만기 도래 대출이 있습니다!</p>
+          <p id="home-maturity-detail" class="text-amber-200/85 mt-0.5"></p>
         </div>
       </div>
 
@@ -236,7 +255,7 @@
       <div class="flex items-center justify-between pt-1">
         <div>
           <h3 class="text-base font-extrabold text-white">내 부채 목록 <span id="debt-count-badge" class="text-xs font-bold text-cyan-400 ml-1 tabular-nums">0건</span></h3>
-          <p class="text-[11px] text-slate-400">상환 방식별 이번 달 원금·이자 비중을 확인하세요</p>
+          <p class="text-[11px] text-slate-400">금융사·만기일·월 예상 이자를 한눈에 관리하세요</p>
         </div>
         <button onclick="openDebtModal()" class="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold shadow-lg shadow-emerald-500/20 active:scale-95 transition">
           + 새 부채 추가
@@ -248,29 +267,41 @@
     </section>
 
     <!-- =========================================================
-         TAB 2: 전략 / 계획 (★ 목표 월 예산 역산 + 시뮬레이터 ★)
+         TAB 2: 전략 / 계획 (스마트 전세 필터 + 목표 월 예산 역산 + 시뮬레이터)
          ========================================================= -->
     <section id="tab-plan" class="hidden space-y-5 animate-fade-up">
+
+      <!-- 스마트 전세대출 필터 토글 바 (홈 탭과 동기화) -->
+      <div class="p-1 rounded-2xl bg-slate-900 border border-slate-800 grid grid-cols-2 gap-1">
+        <button type="button" onclick="setExcludeJeonse(true)" data-jeonse-toggle="exclude"
+          class="py-2 px-2 rounded-xl text-[11px] font-extrabold transition active:scale-[0.98] text-center truncate">
+          🎯 신용·마통 집중 (전세 제외)
+        </button>
+        <button type="button" onclick="setExcludeJeonse(false)" data-jeonse-toggle="include"
+          class="py-2 px-2 rounded-xl text-[11px] font-extrabold transition active:scale-[0.98] text-center truncate">
+          🏠 전체 부채 (전세 포함)
+        </button>
+      </div>
 
       <div class="flex items-start justify-between gap-2">
         <div>
           <h2 class="text-lg font-extrabold text-white">상환 전략 &amp; 예산 역산</h2>
-          <p class="text-xs text-slate-400 mt-0.5">혼합 상환 + 롤오버 기반 목표 완납일 역산 엔진</p>
+          <p id="plan-scope-subtitle" class="text-xs text-slate-400 mt-0.5">신용·마통 집중 모드 (전세대출 제외)</p>
         </div>
         <button onclick="openScheduleModal()" class="shrink-0 px-3 py-2 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 text-xs font-extrabold active:scale-95 transition">
           📅 스케줄표
         </button>
       </div>
 
-      <!-- ★ 신규 핵심 기능: 🎯 목표 완납일 → 월 예산 역산 계산기 카드 ★ -->
+      <!-- 🎯 목표 완납일 → 월 예산 역산 계산기 카드 -->
       <div class="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-cyan-950/50 border border-cyan-500/40 p-4 space-y-4 shadow-xl shadow-cyan-500/5">
         <div class="flex items-start justify-between gap-2">
           <div>
             <div class="flex items-center gap-1.5">
-              <span class="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">NEW</span>
+              <span class="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">이진 탐색</span>
               <h3 class="text-sm font-extrabold text-white">🎯 목표 완납일 → 월 예산 역산</h3>
             </div>
-            <p class="text-[11px] text-slate-400 mt-0.5">원하는 완납 시점을 고르면 필요한 월 예산을 정확히 역산합니다</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">원하는 완납 시점을 고르면 필요한 월 원금 상환액을 역산합니다</p>
           </div>
           <span id="reverse-strategy-tag" class="shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-950 border border-slate-800 text-slate-300">🏔️ 눈사태 기준</span>
         </div>
@@ -289,14 +320,14 @@
           <div class="flex items-center justify-between gap-2">
             <div>
               <p class="text-[11px] font-bold text-slate-400">목표 완납 연월</p>
-              <p id="reverse-months-label" class="text-xs font-extrabold text-cyan-400 mt-0.5 tabular-nums">24개월 뒤 완납 목표</p>
+              <p id="reverse-months-label" class="text-xs font-extrabold text-cyan-400 mt-0.5 tabular-nums">36개월 뒤 완납 목표</p>
             </div>
             <input type="month" id="reverse-month-picker" onchange="handleReverseMonthPicker(this.value)"
               class="bg-slate-900 border border-slate-700 focus:border-cyan-400 rounded-xl px-3 py-2 text-xs font-extrabold text-white tabular-nums outline-none" />
           </div>
 
           <div>
-            <input type="range" id="reverse-months-slider" min="1" max="120" step="1" value="24"
+            <input type="range" id="reverse-months-slider" min="1" max="120" step="1" value="36"
               oninput="setReverseMonths(Number(this.value))" class="w-full cyan-slider" />
             <div class="flex justify-between text-[10px] font-semibold text-slate-500 mt-1 tabular-nums">
               <span>1개월</span>
@@ -357,15 +388,15 @@
         전략을 비교 계산 중입니다...
       </div>
 
-      <!-- 월 추가 상환액 슬라이더 -->
+      <!-- 월 추가 상환액 슬라이더 (최대 600만원) -->
       <div class="rounded-3xl bg-slate-900 border border-slate-800 p-4 space-y-4">
         <div class="flex items-center justify-between gap-2">
           <div>
-            <p class="text-xs font-bold text-slate-200">내 계획: 월 추가 상환액</p>
-            <p class="text-[11px] text-slate-400 mt-0.5">완납된 부채의 납입금도 다음 부채로 자동 롤오버됩니다</p>
+            <p class="text-xs font-bold text-slate-200">내 계획: 월 추가 원금 상환액</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">이자 납부 외에 매월 원금 상환에 투입하는 금액</p>
           </div>
           <div class="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 shrink-0">
-            <input type="number" id="extra-payment-input" min="0" max="50000000" step="10000" value="200000"
+            <input type="number" id="extra-payment-input" min="0" max="50000000" step="50000" value="1500000"
               oninput="handleExtraInput(this.value)"
               class="w-24 bg-transparent text-right text-sm font-extrabold text-emerald-400 outline-none tabular-nums" />
             <span class="text-xs font-bold text-slate-400">원</span>
@@ -373,24 +404,26 @@
         </div>
 
         <div>
-          <input type="range" id="extra-payment-slider" min="0" max="3000000" step="50000" value="200000"
+          <input type="range" id="extra-payment-slider" min="0" max="6000000" step="50000" value="1500000"
             oninput="handleExtraSlider(this.value)" class="w-full" />
           <div class="flex justify-between text-[10px] font-semibold text-slate-500 mt-1 tabular-nums">
             <span>0원</span>
-            <span>100만원</span>
             <span>200만원</span>
-            <span>300만원</span>
+            <span>400만원</span>
+            <span>600만원</span>
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-2.5 pt-1">
           <div class="rounded-2xl bg-emerald-500/10 border border-emerald-500/30 p-3">
-            <p class="text-[11px] text-emerald-300 font-semibold">단축되는 기간</p>
-            <p id="plan-saved-months" class="text-lg font-extrabold text-emerald-400 mt-0.5 tabular-nums">0개월</p>
+            <p class="text-[11px] text-emerald-300 font-semibold">예상 완납 기간</p>
+            <p id="plan-duration-text" class="text-lg font-extrabold text-emerald-400 mt-0.5 tabular-nums">-</p>
+            <p id="plan-monthly-total-sub" class="text-[10px] text-slate-400 mt-0.5 tabular-nums">첫 달 총 예산</p>
           </div>
           <div class="rounded-2xl bg-cyan-500/10 border border-cyan-500/30 p-3">
-            <p class="text-[11px] text-cyan-300 font-semibold">절약되는 총 이자</p>
-            <p id="plan-saved-interest" class="text-lg font-extrabold text-cyan-300 mt-0.5 tabular-nums">0원</p>
+            <p id="plan-interest-label" class="text-[11px] text-cyan-300 font-semibold">완납까지 총 이자</p>
+            <p id="plan-interest-value" class="text-lg font-extrabold text-cyan-300 mt-0.5 tabular-nums">0원</p>
+            <p id="plan-interest-sub" class="text-[10px] text-slate-400 mt-0.5 tabular-nums">이자 감소 효과 포함</p>
           </div>
         </div>
       </div>
@@ -400,7 +433,7 @@
         <div class="flex items-center justify-between">
           <h3 class="text-sm font-extrabold text-white">월별 잔액 추이 비교</h3>
           <div class="flex items-center gap-3 text-[10px] font-semibold">
-            <span class="flex items-center gap-1 text-rose-400"><span class="w-2.5 h-0.5 bg-rose-400 inline-block"></span>기본 상환</span>
+            <span class="flex items-center gap-1 text-rose-400"><span class="w-2.5 h-0.5 bg-rose-400 inline-block"></span>기본(이자만/최소)</span>
             <span class="flex items-center gap-1 text-emerald-400"><span class="w-2.5 h-1 bg-emerald-400 rounded-full inline-block"></span>현재 계획</span>
           </div>
         </div>
@@ -416,7 +449,7 @@
       <div class="rounded-3xl bg-slate-900 border border-slate-800 p-4 space-y-3">
         <div>
           <h3 class="text-sm font-extrabold text-white">단계별 완납 로드맵</h3>
-          <p class="text-[11px] text-slate-400 mt-0.5">선택한 전략과 롤오버가 적용된 완납 예상 순서입니다.</p>
+          <p class="text-[11px] text-slate-400 mt-0.5">선택한 전략으로 각 대출이 0원이 되는 예상 시점입니다.</p>
         </div>
         <div id="roadmap-container" class="space-y-3 pt-1"></div>
       </div>
@@ -446,7 +479,7 @@
         <div class="flex items-center justify-between">
           <div>
             <h3 id="action-month-title" class="text-sm font-extrabold text-white">이번 달 정기 상환 미션</h3>
-            <p class="text-[11px] text-slate-400 mt-0.5">부채별 상환 방식에 따른 이번 달 납입액이 자동 계산됩니다</p>
+            <p class="text-[11px] text-slate-400 mt-0.5">각 대출의 이번 달 이자 및 원금 납부를 체크하세요</p>
           </div>
           <span id="action-month-progress" class="text-xs font-extrabold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full tabular-nums">0/0</span>
         </div>
@@ -497,7 +530,7 @@
     </section>
 
     <!-- =========================================================
-         TAB 4: 기록 / 백업 (상환 히스토리 & JSON 백업)
+         TAB 4: 기록 / 백업 (상환 히스토리 & 엑셀 기본값 초기화 & JSON 백업)
          ========================================================= -->
     <section id="tab-history" class="hidden space-y-5 animate-fade-up">
 
@@ -541,12 +574,12 @@
           </label>
         </div>
 
-        <div class="pt-3 border-t border-slate-800 grid grid-cols-2 gap-2.5">
-          <button onclick="askResetSample()" class="py-2.5 px-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs font-bold text-amber-300 active:scale-95 transition">
-            🔄 샘플 데이터 초기화
+        <div class="pt-3 border-t border-slate-800 space-y-2">
+          <button onclick="askResetExcelData()" class="w-full py-2.5 px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/35 text-xs font-extrabold text-amber-300 active:scale-[0.99] transition">
+            📥 내 엑셀 기본 데이터(7건)로 초기화
           </button>
-          <button onclick="askClearAll()" class="py-2.5 px-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs font-bold text-rose-400 active:scale-95 transition">
-            🗑️ 전체 비우기
+          <button onclick="askClearAll()" class="w-full py-2.5 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/30 text-xs font-bold text-rose-400 active:scale-[0.99] transition">
+            🗑️ 전체 데이터 비우기
           </button>
         </div>
       </div>
@@ -577,7 +610,7 @@
   </nav>
 
   <!-- =========================================================
-       모달 1: 부채 추가 / 수정 (상환 방식 3종 & 실시간 계산 프리뷰)
+       모달 1: 부채 추가 / 수정 (금융사, 만기일, 전세대출 여부, 상환방식 3종)
        ========================================================= -->
   <div id="debt-modal" class="fixed inset-0 z-40 hidden bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4">
     <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl p-5 space-y-4 max-h-[92vh] overflow-y-auto shadow-2xl">
@@ -589,24 +622,42 @@
       <form id="debt-form" onsubmit="saveDebtForm(event)" class="space-y-3.5 text-xs">
         <input type="hidden" id="debt-id" />
 
-        <div class="grid grid-cols-3 gap-2.5">
-          <div class="col-span-2">
-            <label class="block font-bold text-slate-300 mb-1">부채명</label>
-            <input type="text" id="debt-name" required placeholder="예: 카카오뱅크 신용대출"
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block font-bold text-slate-300 mb-1">금융사</label>
+            <input type="text" id="debt-bank" required placeholder="예: 하나은행, 우리은행"
               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none" />
           </div>
           <div>
             <label class="block font-bold text-slate-300 mb-1">분류</label>
             <select id="debt-category" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-2.5 text-sm text-white focus:border-emerald-500 outline-none">
               <option value="신용대출">신용대출</option>
-              <option value="카드론">카드론</option>
               <option value="마이너스통장">마이너스통장</option>
-              <option value="주담대/전세">주담대/전세</option>
+              <option value="전세대출">전세대출</option>
+              <option value="주담대">주담대</option>
+              <option value="카드론">카드론</option>
               <option value="차량/할부">차량/할부</option>
-              <option value="학자금">학자금</option>
               <option value="기타">기타</option>
             </select>
           </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-300 mb-1">대출명</label>
+          <input type="text" id="debt-name" required placeholder="예: 하나원큐신용대출 (우량 #1)"
+            class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5 items-end">
+          <div>
+            <label class="block font-bold text-slate-300 mb-1">만기일</label>
+            <input type="date" id="debt-maturity"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white tabular-nums focus:border-emerald-500 outline-none" />
+          </div>
+          <label class="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 cursor-pointer select-none">
+            <input type="checkbox" id="debt-is-jeonse" class="w-4 h-4 rounded accent-cyan-500" />
+            <span class="text-xs font-bold text-cyan-300">전세대출 (필터 대상)</span>
+          </label>
         </div>
 
         <!-- 상환 방식 3종 선택 -->
@@ -623,25 +674,25 @@
               원금균등
               <span class="block text-[10px] font-normal opacity-80 mt-0.5">이자 점차 감소</span>
             </button>
-            <button type="button" onclick="selectRepaymentType('free')" id="rtype-free"
+            <button type="button" onclick="selectRepaymentType('bullet')" id="rtype-bullet"
               class="py-2.5 px-2 rounded-xl border text-center font-extrabold transition">
               자유·만기일시
-              <span class="block text-[10px] font-normal opacity-80 mt-0.5">월 최소액 지정</span>
+              <span class="block text-[10px] font-normal opacity-80 mt-0.5">이자+자유원금</span>
             </button>
           </div>
-          <input type="hidden" id="debt-repayment-type" value="equal_payment" />
+          <input type="hidden" id="debt-repayment-type" value="bullet" />
         </div>
 
         <div class="grid grid-cols-2 gap-2.5">
           <div>
-            <label class="block font-bold text-slate-300 mb-1">초기 원금 (원)</label>
-            <input type="number" id="debt-initial" required min="1" step="1000" placeholder="18000000"
+            <label class="block font-bold text-slate-300 mb-1">대출 원금 (원)</label>
+            <input type="number" id="debt-original" required min="1" step="1000" placeholder="29000000"
               oninput="updateDebtModalPreview()"
               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white tabular-nums focus:border-emerald-500 outline-none" />
           </div>
           <div>
             <label class="block font-bold text-slate-300 mb-1">현재 잔액 (원)</label>
-            <input type="number" id="debt-balance" required min="0" step="1000" placeholder="18000000"
+            <input type="number" id="debt-balance" required min="0" step="1000" placeholder="29000000"
               oninput="updateDebtModalPreview()"
               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white tabular-nums focus:border-emerald-500 outline-none" />
           </div>
@@ -650,41 +701,35 @@
         <div class="grid grid-cols-3 gap-2.5">
           <div>
             <label class="block font-bold text-slate-300 mb-1">연 이자율 (%)</label>
-            <input type="number" id="debt-apr" required min="0" max="100" step="0.01" placeholder="6.2"
+            <input type="number" id="debt-rate" required min="0" max="100" step="0.01" placeholder="5.30"
               oninput="updateDebtModalPreview()"
               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white tabular-nums focus:border-emerald-500 outline-none" />
-          </div>
-
-          <div id="field-months-wrap">
-            <label class="block font-bold text-slate-300 mb-1">남은 개월 수</label>
-            <input type="number" id="debt-months" min="1" max="600" value="36"
-              oninput="updateDebtModalPreview()"
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-emerald-400 font-bold tabular-nums focus:border-emerald-500 outline-none" />
-          </div>
-
-          <div id="field-minpay-wrap" class="hidden">
-            <label class="block font-bold text-slate-300 mb-1">월 최소납입(원)</label>
-            <input type="number" id="debt-min" min="1000" step="1000" value="150000"
-              oninput="updateDebtModalPreview()"
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-emerald-400 font-bold tabular-nums focus:border-emerald-500 outline-none" />
           </div>
 
           <div>
-            <label class="block font-bold text-slate-300 mb-1">결제일</label>
-            <input type="number" id="debt-dueday" required min="1" max="31" value="25"
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white tabular-nums focus:border-emerald-500 outline-none" />
+            <label class="block font-bold text-slate-300 mb-1">남은 개월 수</label>
+            <input type="number" id="debt-months" min="0" max="600" value="6"
+              oninput="updateDebtModalPreview()"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-emerald-400 font-bold tabular-nums focus:border-emerald-500 outline-none" />
+          </div>
+
+          <div id="field-minpay-wrap">
+            <label class="block font-bold text-slate-300 mb-1">최소 원금상환</label>
+            <input type="number" id="debt-min" min="0" step="10000" value="0"
+              oninput="updateDebtModalPreview()"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-cyan-400 font-bold tabular-nums focus:border-emerald-500 outline-none" />
           </div>
         </div>
 
         <!-- 실시간 월 상환액 계산 프리뷰 -->
         <div class="rounded-2xl bg-slate-950 border border-slate-800 p-3.5 space-y-1.5">
           <div class="flex items-center justify-between">
-            <span class="text-[11px] font-bold text-slate-400">이번 달 예상 납입액</span>
+            <span class="text-[11px] font-bold text-slate-400">이번 달 기본 납입액</span>
             <strong id="preview-monthly-total" class="text-base font-extrabold text-emerald-400 tabular-nums">0원</strong>
           </div>
           <div class="flex items-center justify-between text-[11px] text-slate-400 tabular-nums">
-            <span>원금 <strong id="preview-monthly-principal" class="text-white">0원</strong></span>
-            <span>이자 <strong id="preview-monthly-interest" class="text-rose-400">0원</strong></span>
+            <span>기본 원금 <strong id="preview-monthly-principal" class="text-white">0원</strong></span>
+            <span>월 예상 이자 <strong id="preview-monthly-interest" class="text-rose-400">0원</strong></span>
           </div>
           <p id="preview-formula-hint" class="text-[10px] text-slate-500 pt-0.5"></p>
         </div>
@@ -821,15 +866,15 @@ service cloud.firestore {
           <input type="number" id="pay-amount" required min="1" step="1000" placeholder="금액 입력"
             class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-base font-extrabold text-emerald-400 tabular-nums focus:border-emerald-500 outline-none" />
           <div class="flex gap-1.5 mt-2">
-            <button type="button" onclick="addPayQuick(50000)" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 font-semibold">+5만</button>
             <button type="button" onclick="addPayQuick(100000)" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 font-semibold">+10만</button>
             <button type="button" onclick="addPayQuick(500000)" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 font-semibold">+50만</button>
+            <button type="button" onclick="addPayQuick(1000000)" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 font-semibold">+100만</button>
             <button type="button" onclick="setPayFull()" class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 font-bold">전액 완납</button>
           </div>
         </div>
         <div>
           <label class="block font-bold text-slate-300 mb-1">메모 (선택)</label>
-          <input type="text" id="pay-memo" placeholder="예: 보너스 입금, 중고거래 수익"
+          <input type="text" id="pay-memo" placeholder="예: 월급 원금 상환, 성과급 입금"
             class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white outline-none" />
         </div>
         <div class="flex gap-2.5 pt-2">
@@ -954,56 +999,119 @@ service cloud.firestore {
     }
 
     /* =====================================================================
-       2. 상수 & 초기 샘플 상태 (현실적인 3건 혼합 샘플)
+       2. 상수 & 사용자 실제 엑셀 기반 기본 초기 데이터 (7건 · 2026-11-22 기준)
        ===================================================================== */
-    const STORAGE_KEY = 'debt_zero_planner_v21';
+    const STORAGE_KEY = 'debt_zero_v22_real_state';
     const FB_CONFIG_KEY = 'debt_zero_fb_config_v2';
     const FB_ROOM_KEY = 'debt_zero_fb_room_v2';
     const MAX_SIM_MONTHS = 600;
 
-    function createSampleState() {
+    function createExcelDefaultState() {
       return {
         debts: [
           {
-            id: 'debt_credit_1',
-            name: '신용대출 (1금융)',
-            category: '신용대출',
-            repaymentType: 'equal_payment', // 원리금균등
-            initialBalance: 22000000,
-            balance: 18000000,
-            apr: 6.2,
-            remainingMonths: 36,
-            minPayment: 549250,
-            dueDay: 25
-          },
-          {
-            id: 'debt_card_2',
-            name: '카드론 (고금리)',
-            category: '카드론',
-            repaymentType: 'equal_principal', // 원금균등
-            initialBalance: 6000000,
-            balance: 4500000,
-            apr: 13.8,
-            remainingMonths: 18,
-            minPayment: 301750,
-            dueDay: 15
-          },
-          {
-            id: 'debt_minus_3',
-            name: '마이너스통장',
+            id: 'd1',
+            bank: '하나은행',
+            name: '하나은행 마이너스 통장 (300만)',
             category: '마이너스통장',
-            repaymentType: 'free', // 자유·만기일시
-            initialBalance: 3500000,
-            balance: 3000000,
-            apr: 7.5,
-            remainingMonths: 0,
-            minPayment: 150000,
-            dueDay: 10
+            originalAmount: 3000000,
+            balance: 1892065,
+            rate: 5.99,
+            repaymentType: 'bullet',
+            minPayment: 0,
+            remainingMonths: 2,
+            maturityDate: '2027-02-01',
+            isJeonse: false
+          },
+          {
+            id: 'd2',
+            bank: '하나은행',
+            name: '하나은행 마이너스 통장 (1천만)',
+            category: '마이너스통장',
+            originalAmount: 10000000,
+            balance: 7994555,
+            rate: 5.76,
+            repaymentType: 'bullet',
+            minPayment: 0,
+            remainingMonths: 5,
+            maturityDate: '2027-05-02',
+            isJeonse: false
+          },
+          {
+            id: 'd3',
+            bank: '하나은행',
+            name: '하나원큐신용대출 (우량 #2)',
+            category: '신용대출',
+            originalAmount: 15700000,
+            balance: 15700000,
+            rate: 5.34,
+            repaymentType: 'bullet',
+            minPayment: 0,
+            remainingMonths: 6,
+            maturityDate: '2027-05-19',
+            isJeonse: false
+          },
+          {
+            id: 'd4',
+            bank: '하나은행',
+            name: '하나원큐신용대출 (우량 #1)',
+            category: '신용대출',
+            originalAmount: 29000000,
+            balance: 29000000,
+            rate: 5.30,
+            repaymentType: 'bullet',
+            minPayment: 0,
+            remainingMonths: 1,
+            maturityDate: '2027-01-06',
+            isJeonse: false
+          },
+          {
+            id: 'd5',
+            bank: '우리은행',
+            name: '우리 WON하는 직장인 대출',
+            category: '신용대출',
+            originalAmount: 7000000,
+            balance: 7000000,
+            rate: 5.10,
+            repaymentType: 'bullet',
+            minPayment: 0,
+            remainingMonths: 7,
+            maturityDate: '2027-06-16',
+            isJeonse: false
+          },
+          {
+            id: 'd6',
+            bank: '하나은행',
+            name: '하나원큐신용대출 갈아타기',
+            category: '신용대출',
+            originalAmount: 25000000,
+            balance: 25000000,
+            rate: 4.31,
+            repaymentType: 'bullet',
+            minPayment: 0,
+            remainingMonths: 6,
+            maturityDate: '2027-05-23',
+            isJeonse: false
+          },
+          {
+            id: 'd7',
+            bank: '신한은행',
+            name: '신한전세대출 (주택도시보증)',
+            category: '전세대출',
+            originalAmount: 256000000,
+            balance: 256000000,
+            rate: 4.07,
+            repaymentType: 'bullet',
+            minPayment: 0,
+            remainingMonths: 10,
+            maturityDate: '2027-09-24',
+            isJeonse: true
           }
         ],
-        strategy: 'avalanche', // 'avalanche' | 'snowball'
-        extraMonthly: 200000,
-        targetMonths: 24,      // 목표 완납 개월 수 (역산기 기본값 2년)
+        excludeJeonse: true,   // 기본 ON: 신용·마통 집중 모드 (8,658만원 집중 상환)
+        strategy: 'avalanche', // 'avalanche' (고금리 우선) | 'snowball' (소액 우선)
+        monthlyExtra: 1500000, // 기본 월 추가 원금 상환액 150만원
+        targetMonths: 36,      // 목표 완납 개월 수 기본값 3년(36개월)
         history: [],
         monthlyChecks: {},
         streakDays: 0,
@@ -1023,49 +1131,56 @@ service cloud.firestore {
     let fbRoomId = localStorage.getItem(FB_ROOM_KEY) || 'debt-zero-sync';
 
     function normalizeDebt(d) {
-      const rtype = ['equal_payment', 'equal_principal', 'free'].includes(d.repaymentType)
-        ? d.repaymentType
-        : 'free';
+      let rtype = d.repaymentType;
+      if (rtype === 'free') rtype = 'bullet';
+      if (!['equal_payment', 'equal_principal', 'bullet'].includes(rtype)) rtype = 'bullet';
+
       const balance = Math.max(0, Number(d.balance) || 0);
-      const initialBalance = Math.max(balance, Number(d.initialBalance) || balance);
-      const apr = Math.max(0, Number(d.apr) || 0);
-      const remainingMonths = rtype === 'free' ? 0 : Math.max(1, Math.round(Number(d.remainingMonths) || 24));
-      const minPayment = Math.max(1000, Number(d.minPayment) || 100000);
+      const originalAmount = Math.max(balance, Number(d.originalAmount ?? d.initialBalance) || balance);
+      const rate = Math.max(0, Number(d.rate ?? d.apr) || 0);
+      const remainingMonths = Math.max(0, Math.round(Number(d.remainingMonths) || 0));
+      const minPayment = Math.max(0, Number(d.minPayment) || 0);
+      const category = String(d.category || '기타');
+      const isJeonse = typeof d.isJeonse === 'boolean' ? d.isJeonse : category.includes('전세');
+
       return {
-        id: String(d.id || ('debt_' + Date.now() + Math.random())),
-        name: String(d.name || '이름 없는 부채'),
-        category: String(d.category || '기타'),
-        repaymentType: rtype,
-        initialBalance,
+        id: String(d.id || ('d_' + Date.now() + Math.floor(Math.random() * 1000))),
+        bank: String(d.bank || '은행'),
+        name: String(d.name || '이름 없는 대출'),
+        category,
+        originalAmount,
         balance,
-        apr,
-        remainingMonths,
+        rate,
+        repaymentType: rtype,
         minPayment,
-        dueDay: Math.min(31, Math.max(1, Number(d.dueDay) || 25))
+        remainingMonths,
+        maturityDate: typeof d.maturityDate === 'string' ? d.maturityDate : '',
+        isJeonse
       };
     }
 
     function loadState() {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('debt_zero_planner_v2');
+        const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) {
-          const sample = createSampleState();
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(sample));
-          return sample;
+          const initial = createExcelDefaultState();
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
+          return initial;
         }
         const parsed = JSON.parse(raw);
         return {
           debts: Array.isArray(parsed.debts) ? parsed.debts.map(normalizeDebt) : [],
+          excludeJeonse: typeof parsed.excludeJeonse === 'boolean' ? parsed.excludeJeonse : true,
           strategy: parsed.strategy === 'snowball' ? 'snowball' : 'avalanche',
-          extraMonthly: Math.max(0, Number(parsed.extraMonthly) || 0),
-          targetMonths: Math.min(180, Math.max(1, Math.round(Number(parsed.targetMonths) || 24))),
+          monthlyExtra: Math.max(0, Number(parsed.monthlyExtra ?? parsed.extraMonthly) || 0),
+          targetMonths: Math.min(180, Math.max(1, Math.round(Number(parsed.targetMonths) || 36))),
           history: Array.isArray(parsed.history) ? parsed.history : [],
           monthlyChecks: parsed.monthlyChecks && typeof parsed.monthlyChecks === 'object' ? parsed.monthlyChecks : {},
           streakDays: Number(parsed.streakDays) || 0,
           lastActionDate: parsed.lastActionDate || null
         };
       } catch (e) {
-        return createSampleState();
+        return createExcelDefaultState();
       }
     }
 
@@ -1090,6 +1205,13 @@ service cloud.firestore {
       }
     }
 
+    /* 현재 활성 필터(전세 제외/포함)에 해당하는 부채 목록 반환 */
+    function getScopedDebts() {
+      return state.excludeJeonse
+        ? state.debts.filter(d => !d.isJeonse)
+        : state.debts;
+    }
+
     /* =====================================================================
        3. Firebase Firestore 실시간 양방향 동기화 엔진
        ===================================================================== */
@@ -1100,7 +1222,6 @@ service cloud.firestore {
         if (parsed.apiKey && parsed.projectId) return parsed;
       } catch (e) {}
 
-      // const firebaseConfig = { apiKey: "...", projectId: "..." }; 원문 자동 추출
       const extract = (key) => {
         const regex = new RegExp(key + '\\s*:\\s*["\']([^"\']+)["\']');
         const m = raw.match(regex);
@@ -1135,7 +1256,7 @@ service cloud.firestore {
         badge.className = 'px-2.5 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/35 text-amber-300 text-[11px] font-bold flex items-center gap-1.5 active:scale-95 transition';
         dot.className = 'w-2 h-2 rounded-full bg-amber-400';
         text.textContent = '로컬 모드';
-        roomLabel.textContent = '로컬 저장소 사용 중';
+        roomLabel.textContent = '내 엑셀 데이터 · 로컬 저장';
       }
     }
 
@@ -1156,7 +1277,7 @@ service cloud.firestore {
         }
 
         let app;
-        const appName = 'debtZeroSyncApp';
+        const appName = 'debtZeroSyncAppV22';
         const existing = firebase.apps.find(a => a.name === appName);
         if (existing) {
           if (existing.options.projectId === config.projectId && existing.options.apiKey === config.apiKey) {
@@ -1178,9 +1299,10 @@ service cloud.firestore {
             const data = doc.data();
             state = {
               debts: Array.isArray(data.debts) ? data.debts.map(normalizeDebt) : state.debts,
+              excludeJeonse: typeof data.excludeJeonse === 'boolean' ? data.excludeJeonse : state.excludeJeonse,
               strategy: data.strategy === 'snowball' ? 'snowball' : 'avalanche',
-              extraMonthly: Math.max(0, Number(data.extraMonthly) || 0),
-              targetMonths: Math.min(180, Math.max(1, Math.round(Number(data.targetMonths) || state.targetMonths || 24))),
+              monthlyExtra: Math.max(0, Number(data.monthlyExtra ?? data.extraMonthly) || 0),
+              targetMonths: Math.min(180, Math.max(1, Math.round(Number(data.targetMonths) || state.targetMonths || 36))),
               history: Array.isArray(data.history) ? data.history : [],
               monthlyChecks: data.monthlyChecks && typeof data.monthlyChecks === 'object' ? data.monthlyChecks : {},
               streakDays: Number(data.streakDays) || 0,
@@ -1263,7 +1385,7 @@ service cloud.firestore {
     }
 
     /* =====================================================================
-       4. 포맷터 & 날짜/클립보드 유틸리티
+       4. 포맷터 & 날짜/만기일/클립보드 유틸리티
        ===================================================================== */
     function copyTextToClipboard(text) {
       try {
@@ -1308,6 +1430,14 @@ service cloud.firestore {
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 
+    function getDaysUntilMaturity(maturityDateStr) {
+      if (!maturityDateStr || !/^\d{4}-\d{2}-\d{2}$/.test(maturityDateStr)) return null;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const target = new Date(maturityDateStr + 'T00:00:00');
+      return Math.round((target - today) / (1000 * 60 * 60 * 24));
+    }
+
     function addMonthsToDate(months) {
       const d = new Date();
       d.setDate(1);
@@ -1324,7 +1454,7 @@ service cloud.firestore {
     }
 
     function monthsFromNowToYM(ymStr) {
-      if (!ymStr || !/^\d{4}-\d{2}$/.test(ymStr)) return 24;
+      if (!ymStr || !/^\d{4}-\d{2}$/.test(ymStr)) return 36;
       const [y, m] = ymStr.split('-').map(Number);
       const now = new Date();
       const diff = (y - now.getFullYear()) * 12 + (m - (now.getMonth() + 1));
@@ -1333,7 +1463,7 @@ service cloud.firestore {
 
     function formatMonthsDuration(months) {
       if (months <= 0) return '완납 완료';
-      if (months >= MAX_SIM_MONTHS) return '50년 이상';
+      if (months >= MAX_SIM_MONTHS) return '상환 불가(이자만)';
       const y = Math.floor(months / 12);
       const m = months % 12;
       if (y === 0) return `${m}개월`;
@@ -1353,32 +1483,36 @@ service cloud.firestore {
     function getRepaymentTypeLabel(type) {
       if (type === 'equal_payment') return { label: '원리금균등', cls: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30' };
       if (type === 'equal_principal') return { label: '원금균등', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' };
-      return { label: '자유·만기일시', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' };
+      return { label: '만기일시·자유', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' };
     }
 
     /* =====================================================================
-       5. 정밀 금융 계산기, 혼합 상환 시뮬레이터 & ★ 이진 탐색 역산 엔진 ★
+       5. 정밀 금융 계산기, 만기일시·혼합 상환 시뮬레이터 & 이진 탐색 역산 엔진
        ===================================================================== */
-    function calcEqualPaymentMonthly(principal, apr, months) {
+    function calcEqualPaymentMonthly(principal, rate, months) {
       const P = Math.max(0, Number(principal) || 0);
       const n = Math.max(1, Math.round(Number(months) || 1));
-      const r = Math.max(0, Number(apr) || 0) / 100 / 12;
+      const r = Math.max(0, Number(rate) || 0) / 100 / 12;
       if (P <= 0) return 0;
       if (r === 0) return P / n;
       const pow = Math.pow(1 + r, n);
       return (P * r * pow) / (pow - 1);
     }
 
+    /**
+     * 개별 부채의 이번 달 기본 납입액 / 원금 / 월 예상 이자 계산
+     * bullet(자유·만기일시): 월 이자 + minPayment(기본 원금 상환액, 0원 가능)
+     */
     function getDebtThisMonthBreakdown(debt) {
       const bal = Math.max(0, Number(debt.balance) || 0);
       if (bal <= 0) return { total: 0, principal: 0, interest: 0 };
 
-      const r = (Math.max(0, Number(debt.apr) || 0) / 100) / 12;
+      const r = (Math.max(0, Number(debt.rate) || 0) / 100) / 12;
       const interest = bal * r;
       const n = Math.max(1, Math.round(Number(debt.remainingMonths) || 1));
 
       if (debt.repaymentType === 'equal_payment') {
-        const scheduled = calcEqualPaymentMonthly(bal, debt.apr, n);
+        const scheduled = calcEqualPaymentMonthly(bal, debt.rate, n);
         const total = Math.min(bal + interest, scheduled);
         const principal = Math.max(0, Math.min(bal, total - interest));
         return { total: Math.round(total), principal: Math.round(principal), interest: Math.round(interest) };
@@ -1390,9 +1524,9 @@ service cloud.firestore {
         return { total: Math.round(total), principal: Math.round(principal), interest: Math.round(interest) };
       }
 
-      const minPay = Math.max(0, Number(debt.minPayment) || 0);
-      const total = Math.min(bal + interest, minPay);
-      const principal = Math.max(0, Math.min(bal, total - interest));
+      // bullet (자유·만기일시): 최소한 월 이자는 전액 납부 + minPayment만큼 원금 상환
+      const principal = Math.min(bal, Math.max(0, Number(debt.minPayment) || 0));
+      const total = Math.round(interest) + principal;
       return { total: Math.round(total), principal: Math.round(principal), interest: Math.round(interest) };
     }
 
@@ -1400,41 +1534,48 @@ service cloud.firestore {
       return [...debtsList].sort((a, b) => {
         if (strategy === 'snowball') {
           if (a.balance !== b.balance) return a.balance - b.balance;
-          return b.apr - a.apr;
+          return b.rate - a.rate;
         }
-        if (b.apr !== a.apr) return b.apr - a.apr;
+        if (b.rate !== a.rate) return b.rate - a.rate;
         return a.balance - b.balance;
       });
     }
 
     /**
-     * 원리금균등 / 원금균등 / 자유상환 혼합 월 복리 상환 시뮬레이터
+     * 원리금균등 / 원금균등 / 자유·만기일시 혼합 월 복리 상환 시뮬레이터
+     * - bullet 대출은 매월 이자를 정확히 납부하여 원금이 불어나지 않도록 처리
+     * - monthlyExtra(월 추가 원금 상환액) 및 완납된 대출의 여유 자금은
+     *   선택한 전략(눈사태/눈덩이) 1순위 부채 원금에 100% 집중 투입
      */
-    function simulatePayoff(debtsInput, strategy = 'avalanche', extraMonthly = 0) {
+    function simulatePayoff(debtsInput, strategy = 'avalanche', monthlyExtra = 0) {
       const active = debtsInput
         .filter(d => Number(d.balance) > 0)
         .map(d => {
           const bal = Number(d.balance) || 0;
-          const apr = Number(d.apr) || 0;
-          const rtype = d.repaymentType || 'free';
+          const rate = Number(d.rate) || 0;
+          const rtype = d.repaymentType || 'bullet';
           const n = Math.max(1, Math.round(Number(d.remainingMonths) || 1));
-          const r = apr / 100 / 12;
+          const r = rate / 100 / 12;
 
-          const fixedEqualPayment = rtype === 'equal_payment' ? calcEqualPaymentMonthly(bal, apr, n) : 0;
+          const fixedEqualPayment = rtype === 'equal_payment' ? calcEqualPaymentMonthly(bal, rate, n) : 0;
           const fixedPrincipalStep = rtype === 'equal_principal' ? (bal / n) : 0;
+          const minPrincipal = rtype === 'bullet' ? Math.max(0, Number(d.minPayment) || 0) : 0;
+
+          const month1Interest = bal * r;
           const month1Scheduled = rtype === 'equal_payment'
             ? fixedEqualPayment
             : rtype === 'equal_principal'
-              ? (fixedPrincipalStep + bal * r)
-              : (Number(d.minPayment) || 0);
+              ? (fixedPrincipalStep + month1Interest)
+              : (month1Interest + Math.min(bal, minPrincipal));
 
           return {
             id: d.id,
+            bank: d.bank || '',
             name: d.name,
-            apr,
+            rate,
             repaymentType: rtype,
             balance: bal,
-            minPayment: Number(d.minPayment) || 0,
+            minPrincipal,
             fixedEqualPayment,
             fixedPrincipalStep,
             month1Scheduled,
@@ -1454,20 +1595,13 @@ service cloud.firestore {
           timeline: [{ month: 0, label: '현재', balance: 0 }],
           schedule: [],
           roadmap: [],
-          warningDebts: [],
           capped: false
         };
       }
 
-      const warningDebts = active.filter(d => {
-        if (d.repaymentType !== 'free') return false;
-        const mInterest = d.balance * (d.apr / 100 / 12);
-        return d.minPayment <= mInterest;
-      });
-
       const isMinimumOnly = strategy === 'minimum';
       const baselineBudget = active.reduce((sum, d) => sum + d.month1Scheduled, 0);
-      const totalMonthlyBudget = isMinimumOnly ? baselineBudget : baselineBudget + Math.max(0, Number(extraMonthly) || 0);
+      const totalMonthlyBudget = isMinimumOnly ? baselineBudget : baselineBudget + Math.max(0, Number(monthlyExtra) || 0);
 
       let totalInterest = 0;
       let totalPaidAll = 0;
@@ -1487,22 +1621,27 @@ service cloud.firestore {
         let monthPrincipal = 0;
         let monthRequiredPaid = 0;
 
+        // 1단계: 각 대출의 필수 납입(이자 + 필수 원금)
         for (const d of remainingList) {
-          const interest = d.balance * (d.apr / 100 / 12);
+          const interest = d.balance * (d.rate / 100 / 12);
           monthInterest += interest;
           totalInterest += interest;
 
+          let principalPaid = 0;
           let requiredPay = 0;
+
           if (d.repaymentType === 'equal_payment') {
             requiredPay = Math.min(d.balance + interest, d.fixedEqualPayment);
+            principalPaid = Math.max(0, requiredPay - interest);
           } else if (d.repaymentType === 'equal_principal') {
-            const pPart = Math.min(d.balance, d.fixedPrincipalStep);
-            requiredPay = pPart + interest;
+            principalPaid = Math.min(d.balance, d.fixedPrincipalStep);
+            requiredPay = principalPaid + interest;
           } else {
-            requiredPay = Math.min(d.balance + interest, d.minPayment);
+            // bullet: 매월 이자는 반드시 전액 커버 + minPrincipal 원금 상환
+            principalPaid = Math.min(d.balance, d.minPrincipal);
+            requiredPay = interest + principalPaid;
           }
 
-          const principalPaid = requiredPay - interest;
           d.balance = Math.max(0, d.balance - principalPaid);
           monthRequiredPaid += requiredPay;
           monthPrincipal += principalPaid;
@@ -1513,8 +1652,9 @@ service cloud.firestore {
               d.paidOffMonth = month;
               roadmap.push({
                 id: d.id,
+                bank: d.bank,
                 name: d.name,
-                apr: d.apr,
+                rate: d.rate,
                 repaymentType: d.repaymentType,
                 paidOffMonth: month,
                 dateLabel: addMonthsToDate(month).label
@@ -1523,6 +1663,7 @@ service cloud.firestore {
           }
         }
 
+        // 2단계: 추가 상환액 + 이자 절감/완납 롤오버 자금을 우선순위 타깃 원금에 100% 집중 투입
         let monthExtraPaid = 0;
         if (!isMinimumOnly) {
           let extraPool = Math.max(0, totalMonthlyBudget - monthRequiredPaid);
@@ -1545,8 +1686,9 @@ service cloud.firestore {
                 target.paidOffMonth = month;
                 roadmap.push({
                   id: target.id,
+                  bank: target.bank,
                   name: target.name,
-                  apr: target.apr,
+                  rate: target.rate,
                   repaymentType: target.repaymentType,
                   paidOffMonth: month,
                   dateLabel: addMonthsToDate(month).label
@@ -1581,8 +1723,9 @@ service cloud.firestore {
         if (totalRemaining <= 0.5) break;
       }
 
+      const capped = month >= MAX_SIM_MONTHS && active.some(d => d.balance > 0.5);
       const lastRatio = totalMonthlyBudget > 0 ? Math.min(1, lastMonthTotalPaid / totalMonthlyBudget) : 1;
-      const exactMonths = month > 0 ? (month - 1) + lastRatio : 0;
+      const exactMonths = capped ? MAX_SIM_MONTHS : (month > 0 ? (month - 1) + lastRatio : 0);
 
       return {
         months: month,
@@ -1594,15 +1737,12 @@ service cloud.firestore {
         timeline,
         schedule,
         roadmap,
-        warningDebts,
-        capped: month >= MAX_SIM_MONTHS && active.some(d => d.balance > 0.5)
+        capped
       };
     }
 
     /**
-     * ★ 핵심 신규 기능: 이진 탐색(Binary Search) 기반 목표 완납일 → 월 예산 역산 엔진 ★
-     * 실제 혼합 상환 방식 + 롤오버 시뮬레이션 함수를 그대로 사용하여
-     * targetMonths 이내에 총 잔액 0원이 되는 최소 월 추가 상환액을 1만원 단위로 정확히 산출.
+     * 이진 탐색(Binary Search) 기반 목표 완납일 → 월 예산 역산 엔진
      */
     function solveRequiredBudgetForTargetMonths(debtsInput, strategy, targetMonths) {
       const activeDebts = debtsInput.filter(d => Number(d.balance) > 0);
@@ -1616,7 +1756,7 @@ service cloud.firestore {
       const simMinOnly = simulatePayoff(activeDebts, 'minimum', 0);
       const baselineBudget = simZeroExtra.baselineBudget;
 
-      // 1) 추가 상환 0원(롤오버만 적용)으로도 이미 목표 개월 수 이내 완납 가능한 경우
+      // 추가 상환 0원으로도 이미 목표 개월 수 이내 완납 가능한 경우
       if (!simZeroExtra.capped && simZeroExtra.months <= targetMonths) {
         return {
           empty: false,
@@ -1627,16 +1767,16 @@ service cloud.firestore {
           requiredExtra: 0,
           totalRequiredBudget: baselineBudget,
           simTarget: simZeroExtra,
-          savedInterestVsMin: Math.max(0, simMinOnly.totalInterest - simZeroExtra.totalInterest),
-          savedMonthsVsMin: Math.max(0, simMinOnly.months - simZeroExtra.months)
+          minCapped: simMinOnly.capped,
+          savedInterestVsMin: simMinOnly.capped ? 0 : Math.max(0, simMinOnly.totalInterest - simZeroExtra.totalInterest),
+          savedMonthsVsMin: simMinOnly.capped ? 0 : Math.max(0, simMinOnly.months - simZeroExtra.months)
         };
       }
 
-      // 2) 이진 탐색 상한 설정 (1개월 완납 가능한 충분한 금액)
+      // 이진 탐색 상한 설정
       let low = 0;
       let high = Math.ceil((totalBalance * 1.15) / 10000) * 10000 + 1000000;
 
-      // 상한이 부족할 경우 동적 확장
       let guard = 0;
       while (guard < 15) {
         const testHigh = simulatePayoff(activeDebts, strategy, high);
@@ -1645,9 +1785,8 @@ service cloud.firestore {
         guard++;
       }
 
-      // 이진 탐색 (1만원 단위 해상도로 수렴)
       let bestExtra = high;
-      for (let iter = 0; iter < 32; iter++) {
+      for (let iter = 0; iter < 34; iter++) {
         if (high - low <= 1000) break;
         const mid = Math.floor((low + high) / 2);
         const simMid = simulatePayoff(activeDebts, strategy, mid);
@@ -1659,7 +1798,6 @@ service cloud.firestore {
         }
       }
 
-      // 1만원 단위로 깔끔하게 올림 보정 (반올림 오차로 목표월 초과 방지)
       const roundedExtra = Math.ceil(bestExtra / 10000) * 10000;
       const simTarget = simulatePayoff(activeDebts, strategy, roundedExtra);
 
@@ -1672,25 +1810,53 @@ service cloud.firestore {
         requiredExtra: roundedExtra,
         totalRequiredBudget: baselineBudget + roundedExtra,
         simTarget,
-        savedInterestVsMin: Math.max(0, simMinOnly.totalInterest - simTarget.totalInterest),
-        savedMonthsVsMin: Math.max(0, simMinOnly.months - simTarget.months)
+        minCapped: simMinOnly.capped,
+        savedInterestVsMin: simMinOnly.capped ? 0 : Math.max(0, simMinOnly.totalInterest - simTarget.totalInterest),
+        savedMonthsVsMin: simMinOnly.capped ? 0 : Math.max(0, simMinOnly.months - simTarget.months)
       };
     }
 
     function getTargetDebt() {
-      const active = state.debts.filter(d => d.balance > 0);
-      if (active.length === 0) return null;
-      return sortDebtsByStrategy(active, state.strategy)[0];
+      const scoped = getScopedDebts().filter(d => d.balance > 0);
+      if (scoped.length === 0) {
+        const fallback = state.debts.filter(d => d.balance > 0);
+        if (fallback.length === 0) return null;
+        return sortDebtsByStrategy(fallback, state.strategy)[0];
+      }
+      return sortDebtsByStrategy(scoped, state.strategy)[0];
     }
 
     /* =====================================================================
        6. 전체 화면 렌더링
        ===================================================================== */
     function renderAll() {
+      renderJeonseToggles();
       renderHomeTab();
       renderPlanTab();
       renderActionTab();
       renderHistoryTab();
+    }
+
+    function renderJeonseToggles() {
+      document.querySelectorAll('[data-jeonse-toggle="exclude"]').forEach(btn => {
+        btn.className = state.excludeJeonse
+          ? 'py-2 px-2 rounded-xl text-[11px] font-extrabold bg-emerald-500 text-slate-950 shadow transition active:scale-[0.98] text-center truncate'
+          : 'py-2 px-2 rounded-xl text-[11px] font-bold text-slate-400 hover:text-slate-200 transition active:scale-[0.98] text-center truncate';
+      });
+      document.querySelectorAll('[data-jeonse-toggle="include"]').forEach(btn => {
+        btn.className = !state.excludeJeonse
+          ? 'py-2 px-2 rounded-xl text-[11px] font-extrabold bg-cyan-500 text-slate-950 shadow transition active:scale-[0.98] text-center truncate'
+          : 'py-2 px-2 rounded-xl text-[11px] font-bold text-slate-400 hover:text-slate-200 transition active:scale-[0.98] text-center truncate';
+      });
+    }
+
+    function setExcludeJeonse(exclude) {
+      state.excludeJeonse = Boolean(exclude);
+      saveState();
+      renderAll();
+      showToast(state.excludeJeonse
+        ? '🎯 신용·마통 집중 모드로 전환했습니다 (전세대출 시뮬레이션 제외)'
+        : '🏠 전체 부채 모드(전세대출 포함)로 전환했습니다');
     }
 
     function getMotivationBadge(pct) {
@@ -1703,13 +1869,15 @@ service cloud.firestore {
 
     /* --- TAB 1: 홈/현황 --- */
     function renderHomeTab() {
-      const totalInitial = state.debts.reduce((s, d) => s + Math.max(Number(d.initialBalance) || 0, Number(d.balance) || 0), 0);
-      const totalRemaining = state.debts.reduce((s, d) => s + (Number(d.balance) || 0), 0);
-      const totalPaid = Math.max(0, totalInitial - totalRemaining);
-      const pct = totalInitial > 0 ? Math.min(100, (totalPaid / totalInitial) * 100) : (state.debts.length > 0 ? 100 : 0);
+      const scopedDebts = getScopedDebts();
+      const totalOriginal = scopedDebts.reduce((s, d) => s + Math.max(Number(d.originalAmount) || 0, Number(d.balance) || 0), 0);
+      const totalRemaining = scopedDebts.reduce((s, d) => s + (Number(d.balance) || 0), 0);
+      const totalPaid = Math.max(0, totalOriginal - totalRemaining);
+      const pct = totalOriginal > 0 ? Math.min(100, (totalPaid / totalOriginal) * 100) : (scopedDebts.length > 0 ? 100 : 0);
+      const totalMonthlyInterest = scopedDebts.reduce((s, d) => s + getDebtThisMonthBreakdown(d).interest, 0);
 
-      const simCurrent = simulatePayoff(state.debts, state.strategy, state.extraMonthly);
-      const simMin = simulatePayoff(state.debts, 'minimum', 0);
+      const simCurrent = simulatePayoff(scopedDebts, state.strategy, state.monthlyExtra);
+      const simMin = simulatePayoff(scopedDebts, 'minimum', 0);
 
       const badge = getMotivationBadge(pct);
       const badgeEl = document.getElementById('hero-badge');
@@ -1718,9 +1886,14 @@ service cloud.firestore {
 
       document.getElementById('hero-strategy-pill').textContent =
         (state.strategy === 'avalanche' ? '🏔️ 눈사태' : '⛄ 눈덩이') +
-        (state.extraMonthly > 0 ? ` +월 ${formatShortKRW(state.extraMonthly)}` : '');
+        (state.monthlyExtra > 0 ? ` +월 ${formatShortKRW(state.monthlyExtra)}` : '');
+
+      document.getElementById('hero-mode-caption').textContent = state.excludeJeonse
+        ? `남은 부채 · 신용·마통 ${scopedDebts.length}건 (전세 제외)`
+        : `총 남은 부채 · 전체 ${scopedDebts.length}건 (전세 포함)`;
 
       document.getElementById('hero-remaining').textContent = formatKRW(totalRemaining);
+      document.getElementById('hero-monthly-interest').textContent = formatKRW(totalMonthlyInterest);
       document.getElementById('hero-paid').textContent = formatKRW(totalPaid);
       document.getElementById('hero-progress-text').textContent = `${pct.toFixed(1)}%`;
       document.getElementById('hero-progress-bar').style.width = `${pct}%`;
@@ -1729,8 +1902,8 @@ service cloud.firestore {
         document.getElementById('hero-payoff-date').textContent = '완납 완료 🎉';
         document.getElementById('hero-dday').textContent = 'D-Day 달성!';
       } else if (simCurrent.capped) {
-        document.getElementById('hero-payoff-date').textContent = '50년 초과';
-        document.getElementById('hero-dday').textContent = '상환액 증액 필요';
+        document.getElementById('hero-payoff-date').textContent = '원금 상환액 필요';
+        document.getElementById('hero-dday').textContent = '월 추가 상환액을 설정하세요';
       } else {
         const dt = addMonthsToDate(simCurrent.months);
         const approxDays = Math.max(1, Math.round(simCurrent.exactMonths * 30.4));
@@ -1738,20 +1911,38 @@ service cloud.firestore {
         document.getElementById('hero-dday').textContent = `D-${approxDays.toLocaleString('ko-KR')}일 (${simCurrent.months}개월)`;
       }
 
-      const savedInterest = Math.max(0, simMin.totalInterest - simCurrent.totalInterest);
-      const savedMonths = Math.max(0, simMin.months - simCurrent.months);
-      document.getElementById('hero-saved-interest').textContent = formatKRW(savedInterest);
-      document.getElementById('hero-saved-months').textContent =
-        savedMonths > 0 ? `기본 상환 대비 ${savedMonths}개월 단축` : '자동 롤오버 적용 중';
-
-      const warnBox = document.getElementById('home-warning-banner');
-      if (simCurrent.warningDebts.length > 0) {
-        warnBox.classList.remove('hidden');
-        document.getElementById('home-warning-detail').textContent =
-          simCurrent.warningDebts.map(d => `${d.name} (월 이자 약 ${formatKRW(d.balance * (d.apr / 100 / 12))})`).join(', ') +
-          ' — 월 최소 납입액을 늘리지 않으면 원금이 줄지 않습니다.';
+      // 기본 상환이 만기일시(원금 0원)라 capped인 경우, 완납까지 총 예상 이자를 깔끔하게 표시
+      if (simMin.capped) {
+        document.getElementById('hero-interest-card-title').textContent = '완납까지 총 예상 이자';
+        document.getElementById('hero-interest-card-value').textContent = simCurrent.capped ? '-' : formatKRW(simCurrent.totalInterest);
+        document.getElementById('hero-interest-card-sub').textContent = simCurrent.capped
+          ? '이자만 납부 중'
+          : `첫 달 총 예산 ${formatShortKRW(simCurrent.totalMonthlyBudget)}`;
       } else {
-        warnBox.classList.add('hidden');
+        const savedInterest = Math.max(0, simMin.totalInterest - simCurrent.totalInterest);
+        const savedMonths = Math.max(0, simMin.months - simCurrent.months);
+        document.getElementById('hero-interest-card-title').textContent = '절약 예정 이자';
+        document.getElementById('hero-interest-card-value').textContent = formatKRW(savedInterest);
+        document.getElementById('hero-interest-card-sub').textContent =
+          savedMonths > 0 ? `기본 상환 대비 ${savedMonths}개월 단축` : '자동 롤오버 적용 중';
+      }
+
+      // 90일 이내 만기 임박 대출 알림 배너
+      const imminentDebts = state.debts.filter(d => {
+        if (d.balance <= 0 || !d.maturityDate) return false;
+        const days = getDaysUntilMaturity(d.maturityDate);
+        return days !== null && days <= 90;
+      });
+      const matBanner = document.getElementById('home-maturity-banner');
+      if (imminentDebts.length > 0) {
+        matBanner.classList.remove('hidden');
+        document.getElementById('home-maturity-detail').textContent = imminentDebts.map(d => {
+          const days = getDaysUntilMaturity(d.maturityDate);
+          const dLabel = days <= 0 ? '만기 도래' : `D-${days}일`;
+          return `${d.name} (${d.maturityDate}, ${dLabel})`;
+        }).join(' · ');
+      } else {
+        matBanner.classList.add('hidden');
       }
 
       document.getElementById('debt-count-badge').textContent = `${state.debts.length}건`;
@@ -1767,32 +1958,49 @@ service cloud.firestore {
         return;
       }
 
+      // 전세대출 제외 모드일 때 전세대출은 맨 아래에 정렬하여 시각적으로 구분
+      const orderedForDisplay = [...state.debts].sort((a, b) => {
+        if (state.excludeJeonse && a.isJeonse !== b.isJeonse) return a.isJeonse ? 1 : -1;
+        if (state.strategy === 'snowball') return a.balance - b.balance;
+        return b.rate - a.rate;
+      });
+
       const targetDebt = getTargetDebt();
-      listEl.innerHTML = state.debts.map(d => {
-        const init = Math.max(Number(d.initialBalance) || 0, Number(d.balance) || 0);
+
+      listEl.innerHTML = orderedForDisplay.map(d => {
+        const orig = Math.max(Number(d.originalAmount) || 0, Number(d.balance) || 0);
         const bal = Number(d.balance) || 0;
-        const paid = Math.max(0, init - bal);
-        const dPct = init > 0 ? Math.min(100, (paid / init) * 100) : 100;
+        const paid = Math.max(0, orig - bal);
+        const dPct = orig > 0 ? Math.min(100, (paid / orig) * 100) : 100;
         const isPaidOff = bal <= 0;
-        const isTarget = targetDebt && targetDebt.id === d.id;
-        const isHighApr = d.apr >= 10;
+        const isExcluded = state.excludeJeonse && d.isJeonse;
+        const isTarget = !isExcluded && targetDebt && targetDebt.id === d.id;
+        const isHighRate = d.rate >= 5.5;
         const rBadge = getRepaymentTypeLabel(d.repaymentType);
         const bd = getDebtThisMonthBreakdown(d);
-        const principalRatio = bd.total > 0 ? Math.round((bd.principal / bd.total) * 100) : 0;
-        const interestRatio = bd.total > 0 ? 100 - principalRatio : 0;
+        const daysLeft = getDaysUntilMaturity(d.maturityDate);
+        const isImminent = !isPaidOff && daysLeft !== null && daysLeft <= 90;
+
+        const maturityBadgeHtml = d.maturityDate
+          ? isImminent
+            ? `<span class="px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-rose-500/20 text-rose-300 border border-rose-500/40 tabular-nums">⏰ 만기 임박 ${d.maturityDate} (${daysLeft <= 0 ? '만기' : 'D-' + daysLeft})</span>`
+            : `<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-800 text-slate-400 tabular-nums">만기 ${d.maturityDate}</span>`
+          : '';
 
         return `
-          <div class="rounded-3xl bg-slate-900/90 border ${isTarget ? 'border-emerald-500/50 shadow-lg shadow-emerald-500/5' : 'border-slate-800'} p-4 space-y-3 transition">
+          <div class="rounded-3xl bg-slate-900/90 border ${isTarget ? 'border-emerald-500/50 shadow-lg shadow-emerald-500/5' : isExcluded ? 'border-slate-800/70 opacity-75' : 'border-slate-800'} p-4 space-y-3 transition">
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0">
                 <div class="flex items-center flex-wrap gap-1.5">
+                  <span class="px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-slate-800 text-slate-200">${escapeHtml(d.bank)}</span>
                   <span class="px-2 py-0.5 rounded-lg text-[10px] font-extrabold border ${rBadge.cls}">${rBadge.label}</span>
-                  <span class="px-2 py-0.5 rounded-lg text-[10px] font-extrabold tabular-nums ${isHighApr ? 'bg-rose-500/15 text-rose-400' : 'bg-slate-800 text-slate-300'}">연 ${Number(d.apr).toFixed(2).replace(/\.00$/, '')}%</span>
-                  ${d.repaymentType !== 'free' && !isPaidOff ? `<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-800 text-slate-300 tabular-nums">잔여 ${d.remainingMonths}개월</span>` : ''}
-                  ${isTarget ? '<span class="px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-emerald-500/15 text-emerald-400">🎯 1순위</span>' : ''}
+                  <span class="px-2 py-0.5 rounded-lg text-[10px] font-extrabold tabular-nums ${isHighRate ? 'bg-rose-500/15 text-rose-400' : 'bg-slate-800 text-slate-300'}">연 ${Number(d.rate).toFixed(2)}%</span>
+                  ${isTarget ? '<span class="px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-emerald-500/15 text-emerald-400">🎯 1순위 타깃</span>' : ''}
+                  ${isExcluded ? '<span class="px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">전세대출 · 시뮬레이션 제외됨</span>' : ''}
                   ${isPaidOff ? '<span class="px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-emerald-500 text-slate-950">완납!</span>' : ''}
                 </div>
-                <h4 class="text-base font-extrabold text-white mt-1.5 truncate">${escapeHtml(d.name)} <span class="text-[11px] font-medium text-slate-500">${escapeHtml(d.category)}</span></h4>
+                <h4 class="text-sm font-extrabold text-white mt-1.5 truncate">${escapeHtml(d.name)}</h4>
+                ${maturityBadgeHtml ? `<div class="mt-1.5">${maturityBadgeHtml}</div>` : ''}
               </div>
               <div class="flex items-center gap-1 shrink-0">
                 <button onclick="openDebtModal('${d.id}')" title="수정" class="w-8 h-8 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 hover:text-white text-xs flex items-center justify-center active:scale-95">✏️</button>
@@ -1802,36 +2010,27 @@ service cloud.firestore {
 
             <div class="flex items-baseline justify-between">
               <div>
-                <p class="text-[11px] text-slate-400">남은 잔액</p>
+                <p class="text-[11px] text-slate-400">현재 잔액</p>
                 <p class="text-xl font-extrabold ${isPaidOff ? 'text-emerald-400' : 'text-white'} tabular-nums">${formatKRW(bal)}</p>
               </div>
               <div class="text-right">
-                <p class="text-[11px] text-slate-400">초기 원금 (${dPct.toFixed(0)}% 상환)</p>
-                <p class="text-xs font-bold text-slate-400 tabular-nums">${formatKRW(init)}</p>
+                <p class="text-[11px] text-slate-400">대출 원금 (${dPct.toFixed(1)}% 상환)</p>
+                <p class="text-xs font-bold text-slate-400 tabular-nums">${formatKRW(orig)}</p>
               </div>
             </div>
 
             <div class="w-full h-2 rounded-full bg-slate-950 overflow-hidden">
-              <div class="h-full rounded-full ${isPaidOff ? 'bg-emerald-400' : 'bg-gradient-to-r from-cyan-500 to-emerald-400'} transition-all duration-500" style="width: ${dPct}%"></div>
+              <div class="h-full rounded-full ${isPaidOff ? 'bg-emerald-400' : isExcluded ? 'bg-cyan-500/60' : 'bg-gradient-to-r from-cyan-500 to-emerald-400'} transition-all duration-500" style="width: ${dPct}%"></div>
             </div>
 
             ${!isPaidOff ? `
-              <div class="rounded-2xl bg-slate-950/90 border border-slate-800/80 p-3 space-y-1.5">
-                <div class="flex items-center justify-between text-[11px] tabular-nums">
-                  <span class="text-slate-400">매월 ${d.dueDay}일 · 이번 달 납입액</span>
-                  <strong class="text-white font-extrabold">${formatKRW(bd.total)}</strong>
+              <div class="rounded-2xl bg-slate-950/90 border border-slate-800/80 px-3.5 py-2.5 flex items-center justify-between gap-2">
+                <div class="text-[11px] tabular-nums">
+                  <span class="text-slate-400">월 예상 이자</span>
+                  <strong class="text-rose-400 font-extrabold ml-1.5">${formatKRW(bd.interest)}</strong>
+                  ${bd.principal > 0 ? `<span class="text-slate-500 ml-1">(기본 원금 ${formatShortKRW(bd.principal)})</span>` : ''}
                 </div>
-                <div class="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden flex">
-                  <div class="h-full bg-emerald-400" style="width: ${principalRatio}%"></div>
-                  <div class="h-full bg-rose-400" style="width: ${interestRatio}%"></div>
-                </div>
-                <div class="flex items-center justify-between text-[10px] tabular-nums">
-                  <span class="text-emerald-400 font-bold">원금 ${formatKRW(bd.principal)} (${principalRatio}%)</span>
-                  <span class="text-rose-400 font-bold">이자 ${formatKRW(bd.interest)} (${interestRatio}%)</span>
-                </div>
-              </div>
-              <div class="flex justify-end">
-                <button onclick="openPayModal('${d.id}')" class="px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-xs font-extrabold active:scale-95 transition">
+                <button onclick="openPayModal('${d.id}')" class="shrink-0 px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-xs font-extrabold active:scale-95 transition">
                   💸 즉시 상환
                 </button>
               </div>
@@ -1841,12 +2040,12 @@ service cloud.firestore {
       }).join('');
     }
 
-    /* --- ★ 목표 완납일 → 월 예산 역산 카드 렌더링 ★ --- */
+    /* --- 목표 완납일 → 월 예산 역산 카드 렌더링 --- */
     function renderReverseCalculator() {
-      const targetMonths = Math.min(180, Math.max(1, Number(state.targetMonths) || 24));
+      const scopedDebts = getScopedDebts();
+      const targetMonths = Math.min(180, Math.max(1, Number(state.targetMonths) || 36));
       const targetDate = addMonthsToDate(targetMonths);
 
-      // 프리셋 버튼 활성 표시
       [6, 12, 24, 36, 60].forEach(m => {
         const btn = document.getElementById(`preset-${m}`);
         if (!btn) return;
@@ -1871,7 +2070,7 @@ service cloud.firestore {
       slider.value = Math.min(120, targetMonths);
 
       const box = document.getElementById('reverse-result-box');
-      const res = solveRequiredBudgetForTargetMonths(state.debts, state.strategy, targetMonths);
+      const res = solveRequiredBudgetForTargetMonths(scopedDebts, state.strategy, targetMonths);
 
       if (res.empty) {
         box.innerHTML = `
@@ -1890,8 +2089,8 @@ service cloud.firestore {
               <p class="text-xs font-extrabold text-emerald-300">추가 상환 없이도 목표일 이전 완납 가능!</p>
             </div>
             <p class="text-[11px] text-emerald-100/90 leading-relaxed tabular-nums">
-              현재 필수 월 납입액(<strong>${formatKRW(res.baselineBudget)}</strong>)과 자동 롤오버만 유지해도
-              <strong>${actualDt.label} (${res.actualMonths}개월 뒤)</strong>에 모두 갚을 수 있습니다.
+              현재 필수 월 납입액(<strong>${formatKRW(res.baselineBudget)}</strong>)만 유지해도
+              <strong>${actualDt.label} (${res.actualMonths}개월 뒤)</strong>에 완납할 수 있습니다.
             </p>
             <button onclick="applyReversedBudget(0)" class="w-full mt-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs active:scale-[0.98] transition">
               ✨ 추가 상환 0원으로 내 계획에 적용
@@ -1900,10 +2099,10 @@ service cloud.firestore {
         return;
       }
 
-      const diffFromCurrent = res.requiredExtra - state.extraMonthly;
+      const diffFromCurrent = res.requiredExtra - state.monthlyExtra;
       let diffBadgeHtml = '';
       if (diffFromCurrent > 0) {
-        diffBadgeHtml = `<span class="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 text-[10px] font-extrabold tabular-nums">현재보다 +${formatShortKRW(diffFromCurrent)} 필요</span>`;
+        diffBadgeHtml = `<span class="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 text-[10px] font-extrabold tabular-nums">현재보다 +${formatShortKRW(diffFromCurrent)}</span>`;
       } else if (diffFromCurrent < 0) {
         diffBadgeHtml = `<span class="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-300 text-[10px] font-extrabold tabular-nums">현재보다 ${formatShortKRW(Math.abs(diffFromCurrent))} 여유</span>`;
       } else {
@@ -1919,7 +2118,7 @@ service cloud.firestore {
               <p class="text-[11px] font-bold text-slate-400">목표 달성에 필요한 총 월 예산</p>
               <p class="text-2xl font-black text-white mt-0.5 tabular-nums">${formatKRW(res.totalRequiredBudget)}</p>
               <p class="text-[11px] text-slate-400 mt-0.5 tabular-nums">
-                필수 납입 ${formatShortKRW(res.baselineBudget)} + <strong class="text-cyan-400">추가 ${formatKRW(res.requiredExtra)}</strong>
+                월 이자/필수 ${formatShortKRW(res.baselineBudget)} + <strong class="text-cyan-400">추가 원금 ${formatKRW(res.requiredExtra)}</strong>
               </p>
             </div>
             <div class="text-right shrink-0 space-y-1">
@@ -1930,14 +2129,14 @@ service cloud.firestore {
 
           <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/90">
             <div class="rounded-xl bg-emerald-500/10 border border-emerald-500/25 p-2.5">
-              <p class="text-[10px] text-emerald-300 font-bold">기본 상환 대비 절약</p>
-              <p class="text-xs font-extrabold text-emerald-400 mt-0.5 tabular-nums">이자 ${formatShortKRW(res.savedInterestVsMin)} ↓</p>
-              <p class="text-[10px] text-slate-400 tabular-nums">${res.savedMonthsVsMin}개월 단축</p>
+              <p class="text-[10px] text-emerald-300 font-bold">${res.minCapped ? '완납까지 총 예상 이자' : '기본 상환 대비 절약'}</p>
+              <p class="text-xs font-extrabold text-emerald-400 mt-0.5 tabular-nums">${res.minCapped ? formatShortKRW(res.simTarget.totalInterest) : '이자 ' + formatShortKRW(res.savedInterestVsMin) + ' ↓'}</p>
+              <p class="text-[10px] text-slate-400 tabular-nums">${res.minCapped ? '원금 감소로 이자 매월 축소' : res.savedMonthsVsMin + '개월 단축'}</p>
             </div>
             <div class="rounded-xl bg-amber-500/10 border border-amber-500/25 p-2.5">
-              <p class="text-[10px] text-amber-300 font-bold">하루 절약 환산액</p>
+              <p class="text-[10px] text-amber-300 font-bold">하루 원금 상환 환산</p>
               <p class="text-xs font-extrabold text-amber-300 mt-0.5 tabular-nums">매일 약 ${formatKRW(dailySaving)}</p>
-              <p class="text-[10px] text-slate-400">커피·배달 줄이기 목표</p>
+              <p class="text-[10px] text-slate-400">목표 달성 일일 적립액</p>
             </div>
           </div>
 
@@ -1950,7 +2149,7 @@ service cloud.firestore {
     }
 
     function setReverseMonths(months) {
-      state.targetMonths = Math.min(180, Math.max(1, Math.round(Number(months) || 24)));
+      state.targetMonths = Math.min(180, Math.max(1, Math.round(Number(months) || 36)));
       saveStateToLocalOnly();
       renderReverseCalculator();
     }
@@ -1961,20 +2160,25 @@ service cloud.firestore {
     }
 
     function applyReversedBudget(extraAmount) {
-      state.extraMonthly = Math.max(0, Math.round(Number(extraAmount) || 0));
+      state.monthlyExtra = Math.max(0, Math.round(Number(extraAmount) || 0));
       saveState();
       renderAll();
       launchConfetti();
-      showToast(`✨ 월 추가 상환액 ${formatKRW(state.extraMonthly)}이 내 계획에 즉시 적용되었습니다!`);
+      showToast(`✨ 월 추가 상환액 ${formatKRW(state.monthlyExtra)}이 내 계획에 즉시 적용되었습니다!`);
     }
 
     /* --- TAB 2: 전략/계획 --- */
     function renderPlanTab() {
+      const scopedDebts = getScopedDebts();
+      document.getElementById('plan-scope-subtitle').textContent = state.excludeJeonse
+        ? `신용·마통 집중 모드 (${scopedDebts.length}건 · 전세대출 제외)`
+        : `전체 부채 모드 (${scopedDebts.length}건 · 전세대출 포함)`;
+
       renderReverseCalculator();
 
-      const simAvalanche = simulatePayoff(state.debts, 'avalanche', state.extraMonthly);
-      const simSnowball = simulatePayoff(state.debts, 'snowball', state.extraMonthly);
-      const simMin = simulatePayoff(state.debts, 'minimum', 0);
+      const simAvalanche = simulatePayoff(scopedDebts, 'avalanche', state.monthlyExtra);
+      const simSnowball = simulatePayoff(scopedDebts, 'snowball', state.monthlyExtra);
+      const simMin = simulatePayoff(scopedDebts, 'minimum', 0);
       const simSelected = state.strategy === 'avalanche' ? simAvalanche : simSnowball;
 
       const btnAva = document.getElementById('btn-strategy-avalanche');
@@ -1998,36 +2202,48 @@ service cloud.firestore {
         tagAva.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400';
       }
 
-      document.getElementById('comp-avalanche-months').textContent = formatMonthsDuration(simAvalanche.months);
-      document.getElementById('comp-avalanche-interest').textContent = formatKRW(simAvalanche.totalInterest);
-      document.getElementById('comp-snowball-months').textContent = formatMonthsDuration(simSnowball.months);
-      document.getElementById('comp-snowball-interest').textContent = formatKRW(simSnowball.totalInterest);
+      document.getElementById('comp-avalanche-months').textContent = simAvalanche.capped ? '상환액 필요' : formatMonthsDuration(simAvalanche.months);
+      document.getElementById('comp-avalanche-interest').textContent = simAvalanche.capped ? '-' : formatKRW(simAvalanche.totalInterest);
+      document.getElementById('comp-snowball-months').textContent = simSnowball.capped ? '상환액 필요' : formatMonthsDuration(simSnowball.months);
+      document.getElementById('comp-snowball-interest').textContent = simSnowball.capped ? '-' : formatKRW(simSnowball.totalInterest);
 
       const diffInterest = simSnowball.totalInterest - simAvalanche.totalInterest;
       const diffNote = document.getElementById('strategy-diff-note');
       if (simAvalanche.months === 0) {
-        diffNote.textContent = '모든 부채가 완납된 상태입니다! 🎉';
+        diffNote.textContent = '선택된 범위의 부채가 모두 완납되었습니다! 🎉';
+      } else if (simAvalanche.capped) {
+        diffNote.innerHTML = `⚠️ 만기일시상환 대출은 <strong>월 추가 원금 상환액</strong>을 설정해야 원금이 줄어듭니다.`;
       } else if (diffInterest > 0) {
-        diffNote.innerHTML = `💡 <strong>눈사태 전략</strong>은 눈덩이 전략보다 총 이자를 <strong class="text-emerald-400 tabular-nums">${formatKRW(diffInterest)}</strong> 더 절약합니다.`;
+        diffNote.innerHTML = `💡 <strong>눈사태 전략(고금리 우선)</strong>은 눈덩이 전략보다 총 이자를 <strong class="text-emerald-400 tabular-nums">${formatKRW(diffInterest)}</strong> 더 절약합니다.`;
       } else if (diffInterest < 0) {
         diffNote.innerHTML = `💡 현재 구성에서는 <strong>눈덩이 전략</strong>도 이자 손실 없이 빠른 성취감을 줍니다.`;
       } else {
         diffNote.innerHTML = `💡 현재 조건에서는 두 전략의 예상 완납일과 총 이자가 동일합니다.`;
       }
 
-      document.getElementById('extra-payment-slider').value = Math.min(3000000, state.extraMonthly);
-      document.getElementById('extra-payment-input').value = state.extraMonthly;
+      document.getElementById('extra-payment-slider').value = Math.min(6000000, state.monthlyExtra);
+      document.getElementById('extra-payment-input').value = state.monthlyExtra;
 
-      const savedMonths = Math.max(0, simMin.months - simSelected.months);
-      const savedInterest = Math.max(0, simMin.totalInterest - simSelected.totalInterest);
-      document.getElementById('plan-saved-months').textContent = savedMonths > 0 ? `${savedMonths}개월 단축` : '0개월';
-      document.getElementById('plan-saved-interest').textContent = formatKRW(savedInterest);
+      document.getElementById('plan-duration-text').textContent = simSelected.capped ? '원금 투입 필요' : formatMonthsDuration(simSelected.months);
+      document.getElementById('plan-monthly-total-sub').textContent = `첫 달 총 예산 ${formatShortKRW(simSelected.totalMonthlyBudget)}`;
+
+      if (simMin.capped) {
+        document.getElementById('plan-interest-label').textContent = '완납까지 총 이자';
+        document.getElementById('plan-interest-value').textContent = simSelected.capped ? '-' : formatKRW(simSelected.totalInterest);
+        document.getElementById('plan-interest-sub').textContent = simSelected.capped ? '월 추가 상환액 입력 필요' : `총 상환액 ${formatShortKRW(simSelected.totalPaid)}`;
+      } else {
+        const savedInterest = Math.max(0, simMin.totalInterest - simSelected.totalInterest);
+        const savedMonths = Math.max(0, simMin.months - simSelected.months);
+        document.getElementById('plan-interest-label').textContent = '절약되는 총 이자';
+        document.getElementById('plan-interest-value').textContent = formatKRW(savedInterest);
+        document.getElementById('plan-interest-sub').textContent = savedMonths > 0 ? `기본 대비 ${savedMonths}개월 단축` : '롤오버 적용 중';
+      }
 
       renderPayoffChart(simMin, simSelected);
 
       const roadEl = document.getElementById('roadmap-container');
       if (simSelected.roadmap.length === 0) {
-        roadEl.innerHTML = `<p class="text-xs text-slate-500 text-center py-4">표시할 상환 일정이 없습니다.</p>`;
+        roadEl.innerHTML = `<p class="text-xs text-slate-500 text-center py-4">월 추가 상환액을 설정하면 단계별 완납 일정이 표시됩니다.</p>`;
       } else {
         roadEl.innerHTML = simSelected.roadmap.map((item, idx) => {
           const rb = getRepaymentTypeLabel(item.repaymentType);
@@ -2043,9 +2259,9 @@ service cloud.firestore {
                 <div class="min-w-0">
                   <div class="flex items-center gap-1.5">
                     <p class="text-xs font-extrabold text-white truncate">${escapeHtml(item.name)}</p>
-                    <span class="px-1.5 py-0.5 rounded text-[9px] font-bold border ${rb.cls}">${rb.label}</span>
+                    <span class="px-1.5 py-0.5 rounded text-[9px] font-bold border ${rb.cls} shrink-0">${rb.label}</span>
                   </div>
-                  <p class="text-[11px] text-slate-400 mt-0.5 tabular-nums">연 ${item.apr}% · ${item.paidOffMonth}개월 뒤 완납 ${idx < simSelected.roadmap.length - 1 ? '→ 다음 부채로 롤오버' : '🎉'}</p>
+                  <p class="text-[11px] text-slate-400 mt-0.5 tabular-nums">${escapeHtml(item.bank)} · 연 ${item.rate}% · ${item.paidOffMonth}개월 뒤 완납 ${idx < simSelected.roadmap.length - 1 ? '→ 다음 부채 집중' : '🎉'}</p>
                 </div>
                 <span class="shrink-0 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-extrabold tabular-nums">${item.dateLabel}</span>
               </div>
@@ -2059,21 +2275,25 @@ service cloud.firestore {
       const ctx = document.getElementById('payoff-chart');
       if (!ctx) return;
 
-      const maxLen = Math.max(simMin.timeline.length, simSelected.timeline.length);
-      const step = maxLen > 48 ? Math.ceil(maxLen / 36) : 1;
+      // 만기일시 기본 상환(simMin)이 capped인 경우, X축은 simSelected의 완납 기간(+2개월)에 맞춰 깔끔하게 표시
+      const horizon = simMin.capped
+        ? Math.min(MAX_SIM_MONTHS, Math.max(12, simSelected.timeline.length))
+        : Math.max(simMin.timeline.length, simSelected.timeline.length);
+
+      const step = horizon > 48 ? Math.ceil(horizon / 36) : 1;
       const labels = [];
       const minData = [];
       const selData = [];
 
-      for (let i = 0; i < maxLen; i += step) {
-        const refPoint = simMin.timeline[i] || simSelected.timeline[i];
+      for (let i = 0; i < horizon; i += step) {
+        const refPoint = simSelected.timeline[i] || simMin.timeline[i];
         labels.push(refPoint ? refPoint.label : `${i}M`);
         minData.push(simMin.timeline[i] ? Math.round(simMin.timeline[i].balance / 10000) : 0);
         selData.push(simSelected.timeline[i] ? Math.round(simSelected.timeline[i].balance / 10000) : 0);
       }
-      if ((maxLen - 1) % step !== 0 && maxLen > 1) {
-        const lastIdx = maxLen - 1;
-        const refPoint = simMin.timeline[lastIdx] || simSelected.timeline[lastIdx];
+      if ((horizon - 1) % step !== 0 && horizon > 1) {
+        const lastIdx = horizon - 1;
+        const refPoint = simSelected.timeline[lastIdx] || simMin.timeline[lastIdx];
         labels.push(refPoint ? refPoint.label : `${lastIdx}M`);
         minData.push(simMin.timeline[lastIdx] ? Math.round(simMin.timeline[lastIdx].balance / 10000) : 0);
         selData.push(simSelected.timeline[lastIdx] ? Math.round(simSelected.timeline[lastIdx].balance / 10000) : 0);
@@ -2151,31 +2371,34 @@ service cloud.firestore {
     }
 
     function openScheduleModal() {
-      const sim = simulatePayoff(state.debts, state.strategy, state.extraMonthly);
-      const stratName = state.strategy === 'avalanche' ? '🏔️ 눈사태 전략' : '⛄ 눈덩이 전략';
+      const scopedDebts = getScopedDebts();
+      const sim = simulatePayoff(scopedDebts, state.strategy, state.monthlyExtra);
+      const stratName = state.strategy === 'avalanche' ? '🏔️ 눈사태' : '⛄ 눈덩이';
+      const scopeName = state.excludeJeonse ? '전세 제외' : '전세 포함';
       document.getElementById('schedule-modal-subtitle').textContent =
-        `${stratName} · 월 추가 ${formatKRW(state.extraMonthly)} · 총 ${sim.months}개월`;
+        `${scopeName} · ${stratName} · 월 추가 ${formatShortKRW(state.monthlyExtra)} · ${sim.capped ? '상환액 필요' : '총 ' + sim.months + '개월'}`;
 
       document.getElementById('schedule-summary-bar').innerHTML = `
         <div class="rounded-2xl bg-slate-950 border border-slate-800 p-2.5">
           <p class="text-[10px] text-slate-400">총 납입 예정액</p>
-          <p class="text-xs font-extrabold text-white mt-0.5 tabular-nums">${formatShortKRW(sim.totalPaid)}</p>
+          <p class="text-xs font-extrabold text-white mt-0.5 tabular-nums">${sim.capped ? '-' : formatShortKRW(sim.totalPaid)}</p>
         </div>
         <div class="rounded-2xl bg-slate-950 border border-slate-800 p-2.5">
           <p class="text-[10px] text-slate-400">총 이자</p>
-          <p class="text-xs font-extrabold text-rose-400 mt-0.5 tabular-nums">${formatShortKRW(sim.totalInterest)}</p>
+          <p class="text-xs font-extrabold text-rose-400 mt-0.5 tabular-nums">${sim.capped ? '-' : formatShortKRW(sim.totalInterest)}</p>
         </div>
         <div class="rounded-2xl bg-slate-950 border border-slate-800 p-2.5">
           <p class="text-[10px] text-slate-400">완납 예정</p>
-          <p class="text-xs font-extrabold text-emerald-400 mt-0.5 tabular-nums">${sim.months > 0 ? addMonthsToDate(sim.months).shortLabel : '완료'}</p>
+          <p class="text-xs font-extrabold text-emerald-400 mt-0.5 tabular-nums">${sim.capped ? '-' : (sim.months > 0 ? addMonthsToDate(sim.months).shortLabel : '완료')}</p>
         </div>
       `;
 
       const tbody = document.getElementById('schedule-table-body');
-      if (sim.schedule.length === 0) {
+      const rows = sim.capped ? sim.schedule.slice(0, 60) : sim.schedule;
+      if (rows.length === 0) {
         tbody.innerHTML = `<tr><td colspan="4" class="text-center py-8 text-slate-500">표시할 상환 스케줄이 없습니다.</td></tr>`;
       } else {
-        tbody.innerHTML = sim.schedule.map(row => `
+        tbody.innerHTML = rows.map(row => `
           <tr class="hover:bg-slate-900/60">
             <td class="text-left py-2 px-2.5 text-slate-300 font-bold">
               ${row.month}회 <span class="block text-[10px] text-slate-500 font-normal">${row.dateLabel}</span>
@@ -2196,7 +2419,7 @@ service cloud.firestore {
     function renderActionTab() {
       const monthKey = getCurrentMonthKey();
       const [y, m] = monthKey.split('-');
-      document.getElementById('action-month-title').textContent = `${y}년 ${Number(m)}월 정기 상환 미션`;
+      document.getElementById('action-month-title').textContent = `${y}년 ${Number(m)}월 정기 이자·원금 미션`;
 
       document.getElementById('action-streak').textContent = `${state.streakDays}일째`;
       const impulseTotal = state.history
@@ -2221,14 +2444,14 @@ service cloud.firestore {
             <div class="rounded-2xl bg-slate-950 border ${isChecked ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-slate-800'} p-3.5 flex items-center justify-between gap-3 transition">
               <div class="min-w-0">
                 <div class="flex items-center flex-wrap gap-1.5">
-                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 tabular-nums">${d.dueDay}일</span>
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-800 text-slate-300">${escapeHtml(d.bank)}</span>
                   <span class="text-[9px] font-bold px-1.5 py-0.5 rounded border ${rb.cls}">${rb.label}</span>
                   <span class="text-xs font-extrabold ${isChecked ? 'line-through text-slate-400' : 'text-white'} truncate">${escapeHtml(d.name)}</span>
                 </div>
                 <p class="text-[11px] text-slate-400 mt-1 tabular-nums">
                   ${!isChecked
-                    ? `총 <strong class="text-white">${formatKRW(bd.total)}</strong> <span class="text-slate-500">(원금 ${formatShortKRW(bd.principal)} + 이자 ${formatShortKRW(bd.interest)})</span>`
-                    : '<span class="text-emerald-400 font-bold">✓ 이번 달 정기 상환 완료</span>'}
+                    ? `월 납입 <strong class="text-white">${formatKRW(bd.total)}</strong> <span class="text-slate-500">(이자 ${formatKRW(bd.interest)}${bd.principal > 0 ? ' + 원금 ' + formatShortKRW(bd.principal) : ''})</span>`
+                    : '<span class="text-emerald-400 font-bold">✓ 이번 달 납부 완료</span>'}
                 </p>
               </div>
               <button onclick="toggleMonthlyCheck('${d.id}')"
@@ -2243,7 +2466,7 @@ service cloud.firestore {
       const target = getTargetDebt();
       const targetLabel = document.getElementById('impulse-target-label');
       if (target) {
-        targetLabel.innerHTML = `현재 1순위 타깃: <strong class="text-emerald-400">${escapeHtml(target.name)}</strong> (잔액 ${formatKRW(target.balance)} · 연 ${target.apr}%)`;
+        targetLabel.innerHTML = `현재 1순위 타깃: <strong class="text-emerald-400">${escapeHtml(target.name)}</strong> (잔액 ${formatKRW(target.balance)} · 연 ${target.rate}%)`;
       } else {
         targetLabel.textContent = '모든 부채를 완납했습니다! 정말 대단해요 🎉';
       }
@@ -2263,7 +2486,7 @@ service cloud.firestore {
       }
 
       const typeMap = {
-        regular: { label: '정기 상환', cls: 'bg-cyan-500/15 text-cyan-300' },
+        regular: { label: '정기 납부', cls: 'bg-cyan-500/15 text-cyan-300' },
         extra: { label: '추가 상환', cls: 'bg-emerald-500/15 text-emerald-400' },
         impulse: { label: '충동 방어', cls: 'bg-amber-500/15 text-amber-300' }
       };
@@ -2281,7 +2504,7 @@ service cloud.firestore {
                 ${escapeHtml(h.memo || '상환 기록')} · <span class="tabular-nums">${h.dateStr}</span>
               </p>
               <p class="text-[11px] text-emerald-400 font-extrabold mt-0.5 tabular-nums">
-                -${formatKRW(h.principalApplied)} 원금 차감
+                ${h.principalApplied > 0 ? '-' + formatKRW(h.principalApplied) + ' 원금 차감' : '이자 납부 완료'}
                 ${h.interestPaid > 0 ? `<span class="text-slate-500 font-normal"> (납입 ${formatKRW(h.amount)})</span>` : ''}
               </p>
             </div>
@@ -2324,14 +2547,14 @@ service cloud.firestore {
     }
 
     function handleExtraSlider(val) {
-      state.extraMonthly = Math.max(0, Number(val) || 0);
+      state.monthlyExtra = Math.max(0, Number(val) || 0);
       saveState();
       renderHomeTab();
       renderPlanTab();
     }
 
     function handleExtraInput(val) {
-      state.extraMonthly = Math.max(0, Number(val) || 0);
+      state.monthlyExtra = Math.max(0, Number(val) || 0);
       saveState();
       renderHomeTab();
       renderPlanTab();
@@ -2353,7 +2576,7 @@ service cloud.firestore {
 
     function selectRepaymentType(type) {
       document.getElementById('debt-repayment-type').value = type;
-      ['equal_payment', 'equal_principal', 'free'].forEach(t => {
+      ['equal_payment', 'equal_principal', 'bullet'].forEach(t => {
         const btn = document.getElementById(`rtype-${t}`);
         if (t === type) {
           btn.className = 'py-2.5 px-2 rounded-xl border border-emerald-500 bg-emerald-500/15 text-emerald-300 text-center font-extrabold transition';
@@ -2362,14 +2585,11 @@ service cloud.firestore {
         }
       });
 
-      const monthsWrap = document.getElementById('field-months-wrap');
       const minWrap = document.getElementById('field-minpay-wrap');
-      if (type === 'free') {
-        monthsWrap.classList.add('hidden');
-        minWrap.classList.remove('hidden');
+      if (type === 'bullet') {
+        minWrap.classList.remove('opacity-40', 'pointer-events-none');
       } else {
-        monthsWrap.classList.remove('hidden');
-        minWrap.classList.add('hidden');
+        minWrap.classList.add('opacity-40', 'pointer-events-none');
       }
       updateDebtModalPreview();
     }
@@ -2377,14 +2597,14 @@ service cloud.firestore {
     function updateDebtModalPreview() {
       const type = document.getElementById('debt-repayment-type').value;
       const balance = Math.max(0, Number(document.getElementById('debt-balance').value) || 0);
-      const apr = Math.max(0, Number(document.getElementById('debt-apr').value) || 0);
+      const rate = Math.max(0, Number(document.getElementById('debt-rate').value) || 0);
       const remainingMonths = Math.max(1, Number(document.getElementById('debt-months').value) || 1);
       const minPayment = Math.max(0, Number(document.getElementById('debt-min').value) || 0);
 
       const bd = getDebtThisMonthBreakdown({
         repaymentType: type,
         balance,
-        apr,
+        rate,
         remainingMonths,
         minPayment
       });
@@ -2399,9 +2619,7 @@ service cloud.firestore {
       } else if (type === 'equal_principal') {
         hint.textContent = `원금균등: 매월 고정 원금 ${formatKRW(bd.principal)} + 잔액에 따른 이자(점차 감소)를 납입합니다.`;
       } else {
-        hint.textContent = minPayment <= bd.interest && balance > 0
-          ? '⚠️ 경고: 월 최소 납입액이 월 이자보다 적거나 같습니다!'
-          : '자유·만기일시: 월 이자를 제외한 금액만큼 원금이 차감됩니다.';
+        hint.textContent = `자유·만기일시: 매월 이자(${formatKRW(bd.interest)})를 납부하며, 추가 상환액은 100% 원금에서 차감됩니다.`;
       }
     }
 
@@ -2414,21 +2632,24 @@ service cloud.firestore {
         if (!d) return;
         document.getElementById('debt-modal-title').textContent = '부채 정보 수정';
         document.getElementById('debt-id').value = d.id;
+        document.getElementById('debt-bank').value = d.bank;
         document.getElementById('debt-name').value = d.name;
         document.getElementById('debt-category').value = d.category;
-        document.getElementById('debt-initial').value = d.initialBalance;
+        document.getElementById('debt-maturity').value = d.maturityDate || '';
+        document.getElementById('debt-is-jeonse').checked = Boolean(d.isJeonse);
+        document.getElementById('debt-original').value = d.originalAmount;
         document.getElementById('debt-balance').value = d.balance;
-        document.getElementById('debt-apr').value = d.apr;
-        document.getElementById('debt-months').value = d.remainingMonths || 24;
-        document.getElementById('debt-min').value = d.minPayment || 150000;
-        document.getElementById('debt-dueday').value = d.dueDay;
-        selectRepaymentType(d.repaymentType || 'free');
+        document.getElementById('debt-rate').value = d.rate;
+        document.getElementById('debt-months').value = d.remainingMonths || 6;
+        document.getElementById('debt-min').value = d.minPayment || 0;
+        selectRepaymentType(d.repaymentType || 'bullet');
       } else {
         document.getElementById('debt-modal-title').textContent = '새 부채 추가';
-        document.getElementById('debt-months').value = 36;
-        document.getElementById('debt-min').value = 150000;
-        document.getElementById('debt-dueday').value = 25;
-        selectRepaymentType('equal_payment');
+        document.getElementById('debt-bank').value = '하나은행';
+        document.getElementById('debt-months').value = 12;
+        document.getElementById('debt-min').value = 0;
+        document.getElementById('debt-is-jeonse').checked = false;
+        selectRepaymentType('bullet');
       }
       openModal('debt-modal');
     }
@@ -2436,20 +2657,17 @@ service cloud.firestore {
     function saveDebtForm(e) {
       e.preventDefault();
       const id = document.getElementById('debt-id').value;
+      const bank = document.getElementById('debt-bank').value.trim() || '은행';
       const name = document.getElementById('debt-name').value.trim();
       const category = document.getElementById('debt-category').value;
+      const maturityDate = document.getElementById('debt-maturity').value || '';
+      const isJeonse = document.getElementById('debt-is-jeonse').checked;
       const repaymentType = document.getElementById('debt-repayment-type').value;
-      const initialBalance = Math.max(1, Number(document.getElementById('debt-initial').value) || 0);
+      const originalAmount = Math.max(1, Number(document.getElementById('debt-original').value) || 0);
       const balance = Math.max(0, Number(document.getElementById('debt-balance').value) || 0);
-      const apr = Math.max(0, Number(document.getElementById('debt-apr').value) || 0);
-      const remainingMonths = repaymentType === 'free' ? 0 : Math.max(1, Math.round(Number(document.getElementById('debt-months').value) || 1));
-      const dueDay = Math.min(31, Math.max(1, Number(document.getElementById('debt-dueday').value) || 25));
-
-      let minPayment = Math.max(1000, Number(document.getElementById('debt-min').value) || 100000);
-      if (repaymentType !== 'free') {
-        const bd = getDebtThisMonthBreakdown({ repaymentType, balance, apr, remainingMonths, minPayment });
-        minPayment = Math.max(1000, bd.total);
-      }
+      const rate = Math.max(0, Number(document.getElementById('debt-rate').value) || 0);
+      const remainingMonths = Math.max(0, Math.round(Number(document.getElementById('debt-months').value) || 0));
+      const minPayment = Math.max(0, Number(document.getElementById('debt-min').value) || 0);
 
       if (!name) return;
 
@@ -2457,18 +2675,18 @@ service cloud.firestore {
         const target = state.debts.find(d => d.id === id);
         if (target) {
           Object.assign(target, {
-            name, category, repaymentType,
-            initialBalance: Math.max(initialBalance, balance),
-            balance, apr, remainingMonths, minPayment, dueDay
+            bank, name, category, maturityDate, isJeonse, repaymentType,
+            originalAmount: Math.max(originalAmount, balance),
+            balance, rate, remainingMonths, minPayment
           });
         }
         showToast(`'${name}' 정보를 수정했습니다.`);
       } else {
         state.debts.push({
-          id: 'debt_' + Date.now(),
-          name, category, repaymentType,
-          initialBalance: Math.max(initialBalance, balance),
-          balance, apr, remainingMonths, minPayment, dueDay
+          id: 'd_' + Date.now(),
+          bank, name, category, maturityDate, isJeonse, repaymentType,
+          originalAmount: Math.max(originalAmount, balance),
+          balance, rate, remainingMonths, minPayment
         });
         showToast(`'${name}' 부채가 추가되었습니다.`);
       }
@@ -2496,7 +2714,7 @@ service cloud.firestore {
       document.getElementById('pay-debt-id').value = d.id;
       document.getElementById('pay-modal-subtitle').textContent = `${d.name} · 현재 잔액 ${formatKRW(d.balance)}`;
       document.getElementById('pay-type').value = 'extra';
-      document.getElementById('pay-amount').value = Math.min(d.balance, bd.total || d.minPayment);
+      document.getElementById('pay-amount').value = Math.min(d.balance, Math.max(100000, bd.total));
       document.getElementById('pay-memo').value = '';
       openModal('pay-modal');
     }
@@ -2530,9 +2748,9 @@ service cloud.firestore {
       let monthsDecremented = 0;
 
       if (type === 'regular') {
-        interestPaid = Math.round(d.balance * (d.apr / 100 / 12));
+        interestPaid = Math.round(d.balance * (d.rate / 100 / 12));
         principalApplied = Math.max(0, amount - interestPaid);
-        if (d.repaymentType !== 'free' && d.remainingMonths > 1) {
+        if (d.remainingMonths > 1) {
           d.remainingMonths -= 1;
           monthsDecremented = 1;
         }
@@ -2584,7 +2802,7 @@ service cloud.firestore {
       d.balance = Math.max(0, Math.round(d.balance - principalApplied));
 
       let monthsDecremented = 0;
-      if (d.repaymentType !== 'free' && d.remainingMonths > 1) {
+      if (d.remainingMonths > 1) {
         d.remainingMonths -= 1;
         monthsDecremented = 1;
       }
@@ -2601,7 +2819,7 @@ service cloud.firestore {
         principalApplied,
         interestPaid: bd.interest,
         monthsDecremented,
-        memo: `${monthKey} 정기 상환 완료`,
+        memo: `${monthKey} 정기 납부 완료`,
         monthCheckKey: monthKey,
         dateStr: `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
       });
@@ -2610,7 +2828,9 @@ service cloud.firestore {
       saveState();
       renderAll();
       launchConfetti();
-      showToast(`✅ '${d.name}' 이번 달 상환 완료! (원금 ${formatKRW(principalApplied)} 차감)`);
+      showToast(principalApplied > 0
+        ? `✅ '${d.name}' 납부 완료! (원금 ${formatKRW(principalApplied)} 차감)`
+        : `✅ '${d.name}' 이번 달 이자(${formatKRW(bd.interest)}) 납부 완료!`);
     }
 
     function applyImpulseSaving(amount, label) {
@@ -2621,11 +2841,13 @@ service cloud.firestore {
       }
 
       const payAmount = Math.min(target.balance, Math.max(1, Math.round(amount)));
-      const simBefore = simulatePayoff(state.debts, state.strategy, state.extraMonthly);
+      const scopedBefore = getScopedDebts();
+      const simBefore = simulatePayoff(scopedBefore, state.strategy, state.monthlyExtra);
 
       target.balance = Math.max(0, Math.round(target.balance - payAmount));
 
-      const simAfter = simulatePayoff(state.debts, state.strategy, state.extraMonthly);
+      const scopedAfter = getScopedDebts();
+      const simAfter = simulatePayoff(scopedAfter, state.strategy, state.monthlyExtra);
       const savedInterest = Math.max(0, simBefore.totalInterest - simAfter.totalInterest);
       const daysSaved = Math.max(0, Math.round((simBefore.exactMonths - simAfter.exactMonths) * 30.4));
 
@@ -2685,7 +2907,7 @@ service cloud.firestore {
           const d = state.debts.find(x => x.id === h.debtId);
           if (d) {
             d.balance = Math.round((Number(d.balance) || 0) + (Number(h.principalApplied) || 0));
-            if (h.monthsDecremented && d.repaymentType !== 'free') {
+            if (h.monthsDecremented) {
               d.remainingMonths = (Number(d.remainingMonths) || 0) + Number(h.monthsDecremented);
             }
           }
@@ -2701,7 +2923,7 @@ service cloud.firestore {
     }
 
     /* =====================================================================
-       8. JSON 백업 / 복원 / 초기화
+       8. JSON 백업 / 복원 / 엑셀 기본 데이터 초기화
        ===================================================================== */
     function exportJsonCopy() {
       const jsonStr = JSON.stringify(state, null, 2);
@@ -2719,7 +2941,7 @@ service cloud.firestore {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `debt-zero-v21-backup-${getTodayKey()}.json`;
+        a.download = `debt-zero-v22-backup-${getTodayKey()}.json`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -2741,9 +2963,10 @@ service cloud.firestore {
         if (!parsed || !Array.isArray(parsed.debts)) throw new Error('Invalid');
         state = {
           debts: parsed.debts.map(normalizeDebt),
+          excludeJeonse: typeof parsed.excludeJeonse === 'boolean' ? parsed.excludeJeonse : true,
           strategy: parsed.strategy === 'snowball' ? 'snowball' : 'avalanche',
-          extraMonthly: Math.max(0, Number(parsed.extraMonthly) || 0),
-          targetMonths: Math.min(180, Math.max(1, Math.round(Number(parsed.targetMonths) || 24))),
+          monthlyExtra: Math.max(0, Number(parsed.monthlyExtra ?? parsed.extraMonthly) || 0),
+          targetMonths: Math.min(180, Math.max(1, Math.round(Number(parsed.targetMonths) || 36))),
           history: Array.isArray(parsed.history) ? parsed.history : [],
           monthlyChecks: parsed.monthlyChecks || {},
           streakDays: Number(parsed.streakDays) || 0,
@@ -2776,16 +2999,16 @@ service cloud.firestore {
       reader.readAsText(file);
     }
 
-    function askResetSample() {
+    function askResetExcelData() {
       openConfirmModal(
-        '샘플 데이터 초기화',
-        '현재 데이터를 초기화하고 v2.1 샘플 부채 3건(신용대출·카드론·마이너스통장)을 다시 불러올까요?',
+        '내 엑셀 기본 데이터(7건) 초기화',
+        '현재 데이터를 뱅크샐러드 엑셀 기준 실제 대출 7건(신용·마통 6건 + 신한전세대출 1건)으로 초기화할까요?',
         () => {
-          state = createSampleState();
+          state = createExcelDefaultState();
           saveState();
           document.getElementById('impulse-reward-banner').classList.add('hidden');
           renderAll();
-          showToast('🔄 샘플 데이터로 초기화했습니다.');
+          showToast('📥 내 엑셀 기본 데이터(7건)로 초기화했습니다.');
         }
       );
     }
@@ -2797,9 +3020,10 @@ service cloud.firestore {
         () => {
           state = {
             debts: [],
+            excludeJeonse: true,
             strategy: 'avalanche',
-            extraMonthly: 0,
-            targetMonths: 24,
+            monthlyExtra: 0,
+            targetMonths: 36,
             history: [],
             monthlyChecks: {},
             streakDays: 0,
