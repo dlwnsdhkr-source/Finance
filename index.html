@@ -6,13 +6,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>빚 제로 플래너 · Debt Zero v2.1</title>
 
-  <!-- 모바일 PWA 전체 화면(Standalone) 메타 태그 -->
+  <!-- 모바일 PWA 전체 화면(Standalone) 메타 태그 & 외부 매니페스트 연동 -->
+  <meta name="theme-color" content="#0b1120" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="빚 제로" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="theme-color" content="#020617" />
-  <link id="pwa-manifest" rel="manifest" href="" />
+  <meta name="apple-mobile-web-app-title" content="빚제로" />
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2830/2830284.png" />
+  <link rel="manifest" href="./manifest.json" />
 
   <!-- Inter 폰트 -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -46,7 +47,7 @@
       color-scheme: dark;
     }
     body {
-      background-color: #020617; /* slate-950 */
+      background-color: #0b1120;
       color: #f8fafc;
       -webkit-tap-highlight-color: transparent;
       padding-top: env(safe-area-inset-top);
@@ -119,7 +120,7 @@
 <body class="min-h-screen antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
 
   <!-- 상단 고정 헤더 (Firebase 실시간 동기화 배지 & 설정 버튼) -->
-  <header class="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80">
+  <header class="sticky top-0 z-30 bg-[#0b1120]/90 backdrop-blur-md border-b border-slate-800/80">
     <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between gap-2">
       <div class="flex items-center gap-2.5 min-w-0">
         <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
@@ -150,6 +151,22 @@
 
   <!-- 메인 컨텐츠 영역 -->
   <main class="max-w-md mx-auto px-4 pt-4 pb-8 space-y-5">
+
+    <!-- PWA 정식 앱 설치 배너 (일반 브라우저 접속 & beforeinstallprompt 감지 시 표시) -->
+    <div id="pwa-install-banner" class="hidden rounded-2xl bg-gradient-to-r from-emerald-500/15 via-cyan-500/15 to-slate-900 border border-emerald-500/40 px-3.5 py-3 flex items-center justify-between gap-2.5 shadow-lg animate-fade-up">
+      <div class="min-w-0">
+        <p class="text-xs font-extrabold text-white truncate">📱 주소창 없는 앱으로 설치</p>
+        <p class="text-[11px] text-slate-300 mt-0.5 truncate">홈 화면에 설치하면 전체 화면 앱처럼 바로 열립니다</p>
+      </div>
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button onclick="triggerPwaInstall()" class="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold shadow active:scale-95 transition">
+          설치
+        </button>
+        <button onclick="dismissPwaBanner()" title="닫기" class="w-7 h-7 rounded-lg bg-slate-800/80 text-slate-400 hover:text-white text-xs flex items-center justify-center active:scale-95 transition">
+          ✕
+        </button>
+      </div>
+    </div>
 
     <!-- =========================================================
          TAB 1: 홈 / 현황 (히어로 대시보드 & 부채 목록)
@@ -891,23 +908,51 @@ service cloud.firestore {
 
   <script>
     /* =====================================================================
-       1. PWA 내장 Data URI 매니페스트 등록
+       1. PWA 서비스 워커(sw.js) 자동 등록 & 크롬 앱 설치 배너(beforeinstallprompt)
        ===================================================================== */
-    (function setupPwaManifest() {
-      try {
-        const manifest = {
-          name: '빚 제로 플래너 (Debt Zero v2.1)',
-          short_name: '빚 제로',
-          start_url: '.',
-          display: 'standalone',
-          background_color: '#020617',
-          theme_color: '#020617',
-          description: '목표 완납일 월 예산 역산 & 원리금균등·원금균등 혼합 상환 시뮬레이터'
-        };
-        const dataUri = 'data:application/manifest+json;charset=utf-8,' + encodeURIComponent(JSON.stringify(manifest));
-        document.getElementById('pwa-manifest').setAttribute('href', dataUri);
-      } catch (e) {}
-    })();
+    let deferredInstallPrompt = null;
+
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+      if (!isStandalone) {
+        const banner = document.getElementById('pwa-install-banner');
+        if (banner) banner.classList.remove('hidden');
+      }
+    });
+
+    window.addEventListener('appinstalled', () => {
+      deferredInstallPrompt = null;
+      const banner = document.getElementById('pwa-install-banner');
+      if (banner) banner.classList.add('hidden');
+      showToast('📱 빚 제로 플래너 앱이 홈 화면에 설치되었습니다!');
+    });
+
+    async function triggerPwaInstall() {
+      if (!deferredInstallPrompt) {
+        showToast('크롬 우측 상단 ⋮ 메뉴에서 [홈 화면에 추가 → 설치]를 눌러주세요.');
+        return;
+      }
+      deferredInstallPrompt.prompt();
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      if (outcome === 'accepted') {
+        const banner = document.getElementById('pwa-install-banner');
+        if (banner) banner.classList.add('hidden');
+      }
+      deferredInstallPrompt = null;
+    }
+
+    function dismissPwaBanner() {
+      const banner = document.getElementById('pwa-install-banner');
+      if (banner) banner.classList.add('hidden');
+    }
 
     /* =====================================================================
        2. 상수 & 초기 샘플 상태 (현실적인 3건 혼합 샘플)
